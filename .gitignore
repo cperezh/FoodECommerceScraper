@@ -1,0 +1,17 @@
+# PyCharm dir
+.idea
+
+__pycache__
+
+# Temp dir
+*\tmp
+
+# Logs
+logs
+
+# datafiles
+dataset
+
+# Virtual env
+venv
+
