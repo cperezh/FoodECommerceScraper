@@ -11,6 +11,7 @@ import time
 import sys
 import pandas as pd
 import json
+from Producto import Producto
 
 
 class DiaScraper:
@@ -66,7 +67,7 @@ class DiaScraper:
         t0 = time.time()
         page = session.get(url, headers=self.HEADERS)
         delay = time.time() - t0
-        time.sleep(10 * delay)
+        time.sleep(2 * delay)
         soup = BeautifulSoup(page.content, features='html.parser')
 
         return soup
@@ -249,34 +250,38 @@ class DiaScraper:
 
         return lista_paginas
 
-    def __get_info_from_url(self, url: str) -> dict:
+    def __get_info_from_url(self, url: str) -> Producto:
         """
         param url: url address to scrap
         return: dic with scrapped information.
         """
-        page = self.__get_html_page(url)
-        product_id = url.split('/')[-1]
-        price = self.__obtain_price(page)
-        product, brand = self.__obtain_name(page)
-        unit_price, units = self.__obtain_price_per_unit(page)
-        categories = self.__obtain_categories(page)
-        discount = self.__obtain_discount(page)
-        # comprobamos si hay informacion missing.
-        if any([price is None, product is None, brand is None, unit_price is None, units is None]):
-            logging.warning(f"{url} failed. Missing information.")
-        # guardamos la informacion en un diccionario.
-        dic = {"date": datetime.datetime.strftime(self.execution_datetime, '%Y-%m-%d'), "product": product,
-               "product_id": product_id, "brand": brand, "price": price,
-               "categories": categories, "unit_price": unit_price, "units": units, "discount": discount}
-        return dic
 
-    def __save_record(self, record: dict, filename: str):
+        page = self.__get_html_page(url)
+
+        producto = Producto()
+
+        producto.product_id = url.split('/')[-1]
+        producto.price = self.__obtain_price(page)
+        producto.product, producto.brand = self.__obtain_name(page)
+        producto.unit_price, producto.units = self.__obtain_price_per_unit(page)
+        producto.categories = self.__obtain_categories(page)
+        producto.discount = self.__obtain_discount(page)
+        producto.date = datetime.datetime.strftime(self.execution_datetime, '%Y-%m-%d')
+
+        # comprobamos si hay informacion missing.
+        if any([producto.price is None, producto.product is None, producto.brand is None,
+                producto.unit_price is None, producto.units is None]):
+            logging.warning(f"{url} failed. Missing information.")
+
+        return producto
+
+    def __save_record(self, record: Producto, filename: str):
         """
         saves scrapped information in temp folder.
         """
         with open(os.path.join(self.data_path, 'tmp', hashlib.md5(filename.encode()).hexdigest() + '.json'), 'w+',
                   encoding='utf-8') as f:
-            json.dump(record, f, ensure_ascii=False)
+            json.dump(record.to_dict(), f, ensure_ascii=False)
 
     def __save_results(self):
         """
@@ -334,9 +339,9 @@ class DiaScraper:
 
             logging.info(f"Crawling {product_url}")
             record = self.__get_info_from_url(product_url)
-            logging.info(f"Scanned: {product_number + 1} - product_id: {record['product_id']}")
+            logging.info(f"Scanned: {product_number + 1} - product_id: {record.product_id}")
             try:
-                self.__save_record(record, record["product"])
+                self.__save_record(record, record.product)
             except AttributeError:
                 logging.warning(f"{product_url} failed. No information retrieved.")
         self.__save_results()
