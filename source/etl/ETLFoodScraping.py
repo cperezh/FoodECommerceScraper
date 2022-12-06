@@ -22,7 +22,7 @@ class ETLFoodScraping:
         data_dim_merge = date_dim_new.exceptAll(date_dim)
 
         # Incluimos el Timestamp
-        data_dim_merge = data_dim_merge.withColumn("TsLoad", psf.current_timestamp())
+        data_dim_merge = data_dim_merge.withColumn("ts_load", psf.current_timestamp())
 
         # Actializamos la base de datos.
         self.sparkDB.write_table(data_dim_merge, "date_dim", "append")
@@ -53,11 +53,12 @@ class ETLFoodScraping:
         product_dim_merge = product_dim_new.exceptAll(product_dim_db)
 
         # Añadimos fecha de carga
-        product_dim_merge = product_dim_merge.withColumn("TsLoad", psf.current_timestamp())
+        product_dim_merge = product_dim_merge.withColumn("ts_load", psf.current_timestamp())
+
+        print("Productos actualizados: ", product_dim_merge.count())
 
         self.sparkDB.write_table(product_dim_merge, "producto_dim", "append")
 
-        print("Productos actualizados: ", product_dim_merge.count())
 
     def update_producto_dia_fact(self,  dataset: pyspark.sql.DataFrame):
 
@@ -72,9 +73,16 @@ class ETLFoodScraping:
         # Busco el id_producto
         product_dim_db = self.sparkDB.read_table("producto_dim")
 
-        window_spec = Window.partitionBy("product_id").orderBy("ts_load")
+        window_spec = Window.partitionBy("product_id").orderBy(psf.col("ts_load").desc())
 
-        product_dim_db = product_dim_db.withColumn("row_number", psf.row_number().over(window_spec))
+        product_dim_db = product_dim_db\
+            .withColumn("row_number", psf.row_number().over(window_spec))\
+            .where("row_number = 1")\
+            .join(product_dim_db, on="id_producto")
+
+        #    .where("row_number==1")
+
+        product_dim_db.show(10)
 
         #    .select(["product_id","id_producto"])
 
@@ -90,22 +98,22 @@ class ETLFoodScraping:
         simple_schema = StructType([
             StructField("date", DateType(), True),
             StructField("product", StringType(), True),
-            StructField("product_id", IntegerType(), True),
+            StructField("product_id", StringType(), True),
             StructField("brand", StringType(), True),
             StructField("price", FloatType(), True),
             StructField("categories", StringType(), True),
             StructField("unit_price", FloatType(), True),
             StructField("units", StringType(), True),
             StructField("discount", FloatType(), True),
-            StructField("TsLoad", TimestampType(), True)
+            StructField("ts_load", TimestampType(), True)
         ])
 
         dataset = self.sparkDB.spark.read.option("delimiter", ";") \
             .csv("C:\\Users\\Carlos\\Proyectos\\FoodECommerceScraper\\dataset\\dataset.csv",
                  schema=simple_schema, header=True)
 
-        # self.update_date_dim(dataset)
+        self.update_date_dim(dataset)
 
-        # self.update_producto_dim(dataset)
+        self.update_producto_dim(dataset)
 
-        self.update_producto_dia_fact(dataset)
+        # self.update_producto_dia_fact(dataset)
