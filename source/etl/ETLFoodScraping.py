@@ -24,18 +24,25 @@ class ETLFoodScraping:
         # Incluimos el Timestamp
         data_dim_merge = data_dim_merge.withColumn("ts_load", psf.current_timestamp())
 
-        # Actializamos la base de datos.
-        self.sparkDB.write_table(data_dim_merge, "date_dim", "append")
+        print("Fechas actualizadas: " + str(data_dim_merge.count()))
 
-        print("Fechas actualizadas: "+str(data_dim_merge.count()))
+        # Actializamos la base de datos.
+
+        self.sparkDB.write_table(data_dim_merge, "date_dim", "append")
 
     def update_producto_dim(self, dataset: pyspark.sql.DataFrame):
 
-        # Obtenemos los productos del fichero
-        product_dim_new = dataset.select([dataset.product_id,
-                                          dataset.product,
-                                          dataset.brand,
-                                          dataset.categories]).distinct()
+        # Ventana para obtener la ultima version de cada producto
+        window_spec = Window.partitionBy("product_id").orderBy(psf.col("date").desc())
+
+        # Nos quedamos con la ultima version de cada producto en el dataset
+        product_dim_new = dataset\
+            .withColumn("row_number", psf.row_number().over(window_spec))\
+            .where("row_number = 1")\
+            .select(["product_id",
+                     "product",
+                     "brand",
+                     "categories"])
 
         # Obtenemos os productos de base de datos
         product_dim_db = self.sparkDB.read_table("producto_dim")\
@@ -49,7 +56,7 @@ class ETLFoodScraping:
             if type(product_dim_db.schema[c].dataType) == StringType:
                 product_dim_db = product_dim_db.withColumn(c, psf.trim(product_dim_db[c]))
 
-        # Obtenemos los productos nuevos
+        # Obtenemos los productos nuevos, comparando base de datos con dataset
         product_dim_merge = product_dim_new.exceptAll(product_dim_db)
 
         # Añadimos fecha de carga
@@ -58,7 +65,6 @@ class ETLFoodScraping:
         print("Productos actualizados: ", product_dim_merge.count())
 
         self.sparkDB.write_table(product_dim_merge, "producto_dim", "append")
-
 
     def update_producto_dia_fact(self,  dataset: pyspark.sql.DataFrame):
 
