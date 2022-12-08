@@ -4,6 +4,7 @@ import pyspark.sql.functions as psf
 from pyspark.sql.types import StructType, StructField, DateType, \
     StringType, FloatType, TimestampType, IntegerType
 from SparkDBUtils import SparkDBUtils
+import utils
 
 
 class ETLFoodScraping:
@@ -32,24 +33,31 @@ class ETLFoodScraping:
 
     def update_producto_dim(self, dataset: pyspark.sql.DataFrame):
 
-        # Ventana para obtener la ultima version de cada producto
-        window_spec = Window.partitionBy("product_id").orderBy(psf.col("date").desc())
+        # Ventana para obtener la primera version de cada producto
+        window_spec = Window\
+            .partitionBy(["product_id",
+                          "product",
+                          "brand",
+                          "categories"])\
+            .orderBy(psf.col("date"))
 
-        # Nos quedamos con la ultima version de cada producto en el dataset
+        # Nos quedamos con la primera version de cada producto en el dataset
         product_dim_new = dataset\
             .withColumn("row_number", psf.row_number().over(window_spec))\
             .where("row_number = 1")\
             .select(["product_id",
                      "product",
                      "brand",
-                     "categories"])
+                     "categories",
+                     "date"])
 
         # Obtenemos os productos de base de datos
         product_dim_db = self.sparkDB.read_table("producto_dim")\
             .select(["product_id",
                      "product",
                      "brand",
-                     "categories"])
+                     "categories",
+                     "date"])
 
         # Trim los strings
         for c in product_dim_db.columns:
@@ -69,36 +77,39 @@ class ETLFoodScraping:
     def update_producto_dia_fact(self,  dataset: pyspark.sql.DataFrame):
 
         # obtengo los hechos del fichero
-        producto_dia_fact = dataset.select(["price",
-                                            "unit_price",
-                                            "unit_price",
-                                            "discount",
-                                            "product_id",
-                                            "date"]).distinct()
+        producto_dia_fact = dataset.\
+            select(["price",
+                    "unit_price",
+                    "unit_price",
+                    "discount",
+                    "product_id",
+                    "date"])\
+            .distinct()\
+            .orderBy(["product_id", "date"])
 
-        # Busco el id_producto
+        # Ventana para obtener la ultima version de cada producto
+        window_spec = Window \
+            .partitionBy(["product_id"]) \
+            .orderBy(psf.col("date").desc())
+
+        # Nos quedamos con la primera version de cada producto en el dataset
+        product_dim_new = dataset \
+            .withColumn("row_number", psf.row_number().over(window_spec)) \
+            .where("row_number = 1") \
+            .select(["product_id",
+                     "product",
+                     "brand",
+                     "categories",
+                     "date"])
+
         product_dim_db = self.sparkDB.read_table("producto_dim")
 
-        window_spec = Window.partitionBy("product_id").orderBy(psf.col("ts_load").desc())
-
-        product_dim_db = product_dim_db\
-            .withColumn("row_number", psf.row_number().over(window_spec))\
-            .where("row_number = 1")\
-            .join(product_dim_db, on="id_producto")
-
-        #    .where("row_number==1")
-
-        product_dim_db.show(10)
-
-        #    .select(["product_id","id_producto"])
+        # Hago trim a los string que vienen de base de datos
+        product_dim_db = utils.trim_strings(product_dim_db)
 
 
-        #producto_dia_fact["product_id"] == product_dim["product_id"], "inner")
 
         producto_dia_fact.show(3)
-
-
-
 
     def run(self):
         simple_schema = StructType([
@@ -118,8 +129,8 @@ class ETLFoodScraping:
             .csv("C:\\Users\\Carlos\\Proyectos\\FoodECommerceScraper\\dataset\\dataset.csv",
                  schema=simple_schema, header=True)
 
-        self.update_date_dim(dataset)
+        # self.update_date_dim(dataset)
 
-        self.update_producto_dim(dataset)
+        # self.update_producto_dim(dataset)
 
-        # self.update_producto_dia_fact(dataset)
+        self.update_producto_dia_fact(dataset)
