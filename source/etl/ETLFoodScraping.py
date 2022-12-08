@@ -85,27 +85,48 @@ class ETLFoodScraping:
                     "product_id",
                     "date"])\
             .distinct()\
-            .orderBy(["product_id", "date"])
 
         # Ventana para obtener la ultima version de cada producto
         window_spec = Window \
             .partitionBy(["product_id"]) \
             .orderBy(psf.col("date").desc())
 
-        # Nos quedamos con la primera version de cada producto en el dataset
-        product_dim_new = dataset \
+        product_dim_db = self.sparkDB.read_table("producto_dim") \
             .withColumn("row_number", psf.row_number().over(window_spec)) \
             .where("row_number = 1") \
             .select(["product_id",
-                     "product",
-                     "brand",
-                     "categories",
-                     "date"])
+                     "id_producto"])
 
-        product_dim_db = self.sparkDB.read_table("producto_dim")
+        p = product_dim_db.toPandas()
 
         # Hago trim a los string que vienen de base de datos
         product_dim_db = utils.trim_strings(product_dim_db)
+
+        # tabla de fechas para hacer el lookup
+        date_dim_db = self.sparkDB.read_table("date_dim").select("date, id_date")
+
+        producto_dia_fact = producto_dia_fact\
+            .join(product_dim_db, "product_id", "left")\
+            .join(date_dim_db, "date", "left")\
+            .select(["price",
+                     "unit_price",
+                     "unit_price",
+                     "discount",
+                     "id_producto",
+                     "id_date"])
+
+        # Obtengo los hechos de base de datos
+        producto_dia_fact_db = self.sparkDB.read_table("producto_dia_fact")\
+            .select(["price",
+                     "unit_price",
+                     "unit_price",
+                     "discount",
+                     "id_producto",
+                     "id_date"])
+
+
+
+
 
 
 
