@@ -76,16 +76,6 @@ class ETLFoodScraping:
 
     def update_producto_dia_fact(self,  dataset: pyspark.sql.DataFrame):
 
-        # obtengo los hechos del fichero
-        producto_dia_fact = dataset.\
-            select(["price",
-                    "unit_price",
-                    "unit_price",
-                    "discount",
-                    "product_id",
-                    "date"])\
-            .distinct()\
-
         # Ventana para obtener la ultima version de cada producto
         window_spec = Window \
             .partitionBy(["product_id"]) \
@@ -97,20 +87,19 @@ class ETLFoodScraping:
             .select(["product_id",
                      "id_producto"])
 
-        p = product_dim_db.toPandas()
-
         # Hago trim a los string que vienen de base de datos
         product_dim_db = utils.trim_strings(product_dim_db)
 
         # tabla de fechas para hacer el lookup
-        date_dim_db = self.sparkDB.read_table("date_dim").select("date, id_date")
+        date_dim_db = self.sparkDB.read_table("date_dim").select(["date", "id_date"])
 
-        producto_dia_fact = producto_dia_fact\
+        # obtengo los hechos del fichero
+        producto_dia_fact_new = dataset\
             .join(product_dim_db, "product_id", "left")\
             .join(date_dim_db, "date", "left")\
             .select(["price",
                      "unit_price",
-                     "unit_price",
+                     "units",
                      "discount",
                      "id_producto",
                      "id_date"])
@@ -119,18 +108,20 @@ class ETLFoodScraping:
         producto_dia_fact_db = self.sparkDB.read_table("producto_dia_fact")\
             .select(["price",
                      "unit_price",
-                     "unit_price",
+                     "units",
                      "discount",
                      "id_producto",
                      "id_date"])
 
+        # Obtenemos los hechos nuevos, comparando base de datos con dataset
+        producto_dia_fact_merge = producto_dia_fact_new.exceptAll(producto_dia_fact_db)
 
+        # Añadimos fecha de carga
+        producto_dia_fact_merge = producto_dia_fact_merge.withColumn("ts_load", psf.current_timestamp())
 
+        print("Hechos actualizados: ", producto_dia_fact_merge.count())
 
-
-
-
-        producto_dia_fact.show(3)
+        self.sparkDB.write_table(producto_dia_fact_merge, "producto_dia_fact", "append")
 
     def run(self):
         simple_schema = StructType([
@@ -150,8 +141,8 @@ class ETLFoodScraping:
             .csv("C:\\Users\\Carlos\\Proyectos\\FoodECommerceScraper\\dataset\\dataset.csv",
                  schema=simple_schema, header=True)
 
-        # self.update_date_dim(dataset)
+        self.update_date_dim(dataset)
 
-        # self.update_producto_dim(dataset)
+        self.update_producto_dim(dataset)
 
         self.update_producto_dia_fact(dataset)
