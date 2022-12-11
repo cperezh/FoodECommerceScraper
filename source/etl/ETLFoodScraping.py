@@ -2,9 +2,8 @@ import pyspark.sql
 from pyspark.sql.window import Window
 import pyspark.sql.functions as psf
 from pyspark.sql.types import StructType, StructField, DateType, \
-    StringType, FloatType, TimestampType, IntegerType
+    StringType, FloatType, TimestampType
 from SparkDBUtils import SparkDBUtils
-import utils
 
 
 class ETLFoodScraping:
@@ -86,9 +85,6 @@ class ETLFoodScraping:
             .where("row_number = 1") \
             .select(["product_id",
                      "id_producto"])
-
-        # Hago trim a los string que vienen de base de datos
-        product_dim_db = utils.trim_strings(product_dim_db)
 
         # tabla de fechas para hacer el lookup
         date_dim_db = self.sparkDB.read_table("date_dim").select(["date", "id_date"])

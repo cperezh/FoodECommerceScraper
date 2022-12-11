@@ -1,4 +1,5 @@
 import pyspark.sql
+import utils
 from pyspark.sql import SparkSession
 
 
@@ -19,6 +20,9 @@ class SparkDBUtils:
             .option("password", "postgres") \
             .option("driver", "org.postgresql.Driver") \
             .load()
+
+        # Hago trim a los string que vienen de base de datos
+        df = utils.trim_strings(df)
 
         return df
 
