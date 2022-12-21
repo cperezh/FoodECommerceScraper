@@ -4,6 +4,7 @@ import pyspark.sql.functions as psf
 from pyspark.sql.types import StructType, StructField, DateType, \
     StringType, FloatType, TimestampType
 from SparkDBUtils import SparkDBUtils
+import pyspark.pandas as ps
 
 
 class ETLFoodScraping:
@@ -119,6 +120,30 @@ class ETLFoodScraping:
 
         self.sparkDB.write_table(producto_dia_fact_merge, "producto_dia_fact", "append")
 
+    def update_precio_dia_norm_fact(self):
+
+        producto_dia_fact = self.sparkDB.read_table("producto_dia_fact")
+
+        pdf_pandas = producto_dia_fact.pandas_api()
+
+        producto_dia_fact = producto_dia_fact\
+            .withColumn("price_norm",
+                        (psf.col("price") - pdf_pandas["price"].min()) /
+                        (pdf_pandas["price"].max()-pdf_pandas["price"].min()))\
+            .withColumn("unit_price_norm",
+                        (psf.col("unit_price") - pdf_pandas["unit_price"].min()) /
+                        (pdf_pandas["unit_price"].max()-pdf_pandas["unit_price"].min()))
+
+        producto_dia_fact_agg = producto_dia_fact\
+            .groupby("id_date")\
+            .agg(psf.sum("price_norm").alias("sum_price_norm"),
+                 psf.sum("unit_price_norm").alias("sum_unit_price_norm"),
+                 psf.count("id_producto").alias("num_products"))
+
+        p2 = producto_dia_fact_agg.toPandas()
+
+        print("hola")
+
     def run(self):
         simple_schema = StructType([
             StructField("date", DateType(), True),
@@ -137,8 +162,10 @@ class ETLFoodScraping:
             .csv("C:\\Users\\Carlos\\Proyectos\\FoodECommerceScraper\\dataset\\dataset.csv",
                  schema=simple_schema, header=True)
 
-        self.update_date_dim(dataset)
+        # self.update_date_dim(dataset)
 
-        self.update_producto_dim(dataset)
+        # self.update_producto_dim(dataset)
 
-        self.update_producto_dia_fact(dataset)
+        # self.update_producto_dia_fact(dataset)
+
+        self.update_precio_dia_norm_fact()
