@@ -134,15 +134,15 @@ class ETLFoodScraping:
                         (psf.col("unit_price") - pdf_pandas["unit_price"].min()) /
                         (pdf_pandas["unit_price"].max()-pdf_pandas["unit_price"].min()))
 
-        producto_dia_fact_agg = producto_dia_fact\
+        precio_dia_norm_fact = producto_dia_fact\
             .groupby("id_date")\
             .agg(psf.sum("price_norm").alias("sum_price_norm"),
                  psf.sum("unit_price_norm").alias("sum_unit_price_norm"),
                  psf.count("id_producto").alias("num_products"))
 
-        p2 = producto_dia_fact_agg.toPandas()
+        self.sparkDB.write_table(precio_dia_norm_fact, "precio_dia_norm_fact", "overwrite")
 
-        print("hola")
+        print("precio_dia_norm_fact creada")
 
     def run(self):
         simple_schema = StructType([
@@ -162,10 +162,10 @@ class ETLFoodScraping:
             .csv("C:\\Users\\Carlos\\Proyectos\\FoodECommerceScraper\\dataset\\dataset.csv",
                  schema=simple_schema, header=True)
 
-        # self.update_date_dim(dataset)
+        self.update_date_dim(dataset)
 
-        # self.update_producto_dim(dataset)
+        self.update_producto_dim(dataset)
 
-        # self.update_producto_dia_fact(dataset)
+        self.update_producto_dia_fact(dataset)
 
         self.update_precio_dia_norm_fact()
