@@ -124,25 +124,25 @@ class ETLFoodScraping:
 
         producto_dia_fact = self.sparkDB.read_table("producto_dia_fact")
 
-        pdf_pandas = producto_dia_fact.pandas_api()
-
-        producto_dia_fact = producto_dia_fact\
-            .withColumn("price_norm",
-                        (psf.col("price") - pdf_pandas["price"].min()) /
-                        (pdf_pandas["price"].max()-pdf_pandas["price"].min()))\
-            .withColumn("unit_price_norm",
-                        (psf.col("unit_price") - pdf_pandas["unit_price"].min()) /
-                        (pdf_pandas["unit_price"].max()-pdf_pandas["unit_price"].min()))
-
-        precio_dia_norm_fact = producto_dia_fact\
+        price_dia_agg_fact = producto_dia_fact\
             .groupby("id_date")\
-            .agg(psf.sum("price_norm").alias("sum_price_norm"),
-                 psf.sum("unit_price_norm").alias("sum_unit_price_norm"),
+            .agg(psf.sum("price").alias("sum_price"),
+                 psf.sum("unit_price").alias("sum_unit_price"),
                  psf.count("id_producto").alias("num_products"))
 
-        self.sparkDB.write_table(precio_dia_norm_fact, "precio_dia_norm_fact", "overwrite")
+        pdf_pandas = price_dia_agg_fact.pandas_api()
 
-        print("precio_dia_norm_fact creada")
+        precio_dia_agg_norm_fact = price_dia_agg_fact \
+            .withColumn("sum_price_norm",
+                        (psf.col("sum_price") - pdf_pandas["sum_price"].min()) /
+                        (pdf_pandas["sum_price"].max() - pdf_pandas["sum_price"].min())) \
+            .withColumn("sum_unit_price_norm",
+                        (psf.col("sum_unit_price") - pdf_pandas["sum_unit_price"].min()) /
+                        (pdf_pandas["sum_unit_price"].max() - pdf_pandas["sum_unit_price"].min()))
+
+        self.sparkDB.write_table(precio_dia_agg_norm_fact, "precio_dia_agg_norm_fact", "overwrite")
+
+        print("precio_dia_agg_norm_fact creada")
 
     def run(self):
         simple_schema = StructType([
