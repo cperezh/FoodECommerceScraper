@@ -124,21 +124,28 @@ class ETLFoodScraping:
 
         producto_dia_fact = self.sparkDB.read_table("producto_dia_fact")
 
+        # Agrupo a nivel de DIA, para calcular el total de precios diarios
         price_dia_agg_fact = producto_dia_fact\
             .groupby("id_date")\
             .agg(psf.sum("price").alias("sum_price"),
                  psf.sum("unit_price").alias("sum_unit_price"),
                  psf.count("id_producto").alias("num_products"))
 
+        # Creo columns de precio diario ponderado por el numero de productos del dia
+        price_dia_agg_fact = price_dia_agg_fact \
+            .withColumn("sum_price_ponderado", psf.col("sum_price") / psf.col("num_products")) \
+            .withColumn("sum_unit_price_ponderado", psf.col("sum_unit_price") / psf.col("num_products"))
+
         pdf_pandas = price_dia_agg_fact.pandas_api()
 
+        # Aplico normalización min-max para poder comparar los precios
         precio_dia_agg_norm_fact = price_dia_agg_fact \
             .withColumn("sum_price_norm",
-                        (psf.col("sum_price") - pdf_pandas["sum_price"].min()) /
-                        (pdf_pandas["sum_price"].max() - pdf_pandas["sum_price"].min())) \
+                        (psf.col("sum_price_ponderado") - pdf_pandas["sum_price_ponderado"].min()) /
+                        (pdf_pandas["sum_price_ponderado"].max() - pdf_pandas["sum_price_ponderado"].min())) \
             .withColumn("sum_unit_price_norm",
-                        (psf.col("sum_unit_price") - pdf_pandas["sum_unit_price"].min()) /
-                        (pdf_pandas["sum_unit_price"].max() - pdf_pandas["sum_unit_price"].min()))
+                        (psf.col("sum_unit_price_ponderado") - pdf_pandas["sum_unit_price_ponderado"].min()) /
+                        (pdf_pandas["sum_unit_price_ponderado"].max() - pdf_pandas["sum_unit_price_ponderado"].min()))
 
         self.sparkDB.write_table(precio_dia_agg_norm_fact, "precio_dia_agg_norm_fact", "overwrite")
 
