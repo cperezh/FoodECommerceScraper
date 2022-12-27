@@ -225,16 +225,21 @@ class DiaScraper:
         :return:
         """
 
-        paginator_bottom = category_page.find("div", class_="paginatorBottom")
+        try:
 
-        # navegamos hasta la paginacion
-        pagination_list = paginator_bottom.find("div", class_="pagination-list-and-total")
+            paginator_bottom = category_page.find("div", class_="paginatorBottom")
 
-        # obtenemos el span con el texto "de X" siendo X el numero maximno de paginas, por ejemplo "de 21"
-        span = str(pagination_list.span.string)
+            # navegamos hasta la paginacion
+            pagination_list = paginator_bottom.find("div", class_="pagination-list-and-total")
 
-        # Sacamos el numero decimal del texto
-        numb = int(re.search('\d+', span).group())
+            # obtenemos el span con el texto "de X" siendo X el numero maximno de paginas, por ejemplo "de 21"
+            span = str(pagination_list.span.string)
+
+            # Sacamos el numero decimal del texto
+            numb = int(re.search('\d+', span).group())
+
+        except Exception as e:
+            numb = 1
 
         lista_paginas = []
 
