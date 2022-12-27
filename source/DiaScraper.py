@@ -238,7 +238,8 @@ class DiaScraper:
             # Sacamos el numero decimal del texto
             numb = int(re.search('\d+', span).group())
 
-        except Exception as e:
+        # En caso de que la página no tenga la pie de pagina
+        except:
             numb = 1
 
         lista_paginas = []
