@@ -2,9 +2,17 @@ import pyspark.sql
 from pyspark.sql.window import Window
 import pyspark.sql.functions as psf
 from pyspark.sql.types import StructType, StructField, DateType, \
-    StringType, FloatType, TimestampType
+    StringType, FloatType, TimestampType, ArrayType
 from SparkDBUtils import SparkDBUtils
-import pyspark.pandas as ps
+import pandas as pd
+
+
+@psf.pandas_udf(StringType())
+def split_categorie(categorie_col):
+
+    categorie_col = categorie_col
+
+    return categorie_col
 
 
 class ETLFoodScraping:
@@ -41,7 +49,8 @@ class ETLFoodScraping:
                           "categories"])\
             .orderBy(psf.col("date"))
 
-        # Nos quedamos con la primera version de cada producto en el dataset
+        # Nos quedamos con la primera version de cada producto en el dataset,
+        # ya que se repiten en todas las fechas
         product_dim_new = dataset\
             .withColumn("row_number", psf.row_number().over(window_spec))\
             .where("row_number = 1")\
@@ -67,12 +76,17 @@ class ETLFoodScraping:
         # Obtenemos los productos nuevos, comparando base de datos con dataset
         product_dim_merge = product_dim_new.exceptAll(product_dim_db)
 
-        # Añadimos fecha de carga
-        product_dim_merge = product_dim_merge.withColumn("ts_load", psf.current_timestamp())
+        pandas = product_dim_merge.pandas_api()
+
+        # Añadimos fecha de carga y las categorias
+        product_dim_merge = product_dim_merge\
+            .withColumn("ts_load", psf.current_timestamp())\
+            .withColumn("categoria", split_categorie(psf.col("categories")))
 
         print("Productos actualizados: ", product_dim_merge.count())
 
         self.sparkDB.write_table(product_dim_merge, "producto_dim", "append")
+
 
     def update_producto_dia_fact(self,  dataset: pyspark.sql.DataFrame):
 
