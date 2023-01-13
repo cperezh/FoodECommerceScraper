@@ -28,6 +28,7 @@ CREATE TABLE public.date_dim
 (
     id_date serial NOT NULL,
     date date,
+	ts_load timestamp with time zone,
     PRIMARY KEY (id_date)
 )
 WITH (

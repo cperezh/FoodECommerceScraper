@@ -9,9 +9,6 @@ __pycache__
 # Logs
 logs
 
-# datafiles
-dataset
-
 # Virtual env
 venv
 

@@ -35,11 +35,11 @@ To run start scraping. The process is divided in two steps:
 or to scrape the products list file again from the online site. Can be ```False``` for using chached file or 
 ```True``` to reload the list.
 
-## Dataset
-
-Because of copyright issues, we connot share the final dataset. 
-
-This is a simulated published dataset: **ZENODO** Doi URL: 
-
-
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7334808.svg)](https://doi.org/10.5281/zenodo.7334808)
+## ETL
+  ```Run source/etl/main```
+  
+- To install HADOOP, set the next variables:
+  - HADOOP_HOME=[..]\winutils\hadoop-3.0.0
+  - PATH=[..]\winutils\hadoop-3.0.0\bin
+  - PYSPARK_PYTHON=python
+- Download Winutils: https://github.com/steveloughran/winutils
