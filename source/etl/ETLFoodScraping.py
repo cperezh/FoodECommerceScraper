@@ -10,9 +10,11 @@ import pandas as pd
 @psf.pandas_udf(StringType())
 def split_categorie(categorie_col):
 
-    categorie_col = categorie_col
+    df = categorie_col.str.extractall(r"'(.)'")[0]
 
-    return categorie_col
+    salida = df.groupby(level=0).agg(lambda x: list(x))
+
+    return salida
 
 
 class ETLFoodScraping:
