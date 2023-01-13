@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS public.producto_dim
     id_producto integer NOT NULL DEFAULT nextval('producto_dim_id_producto_seq'::regclass),
     ts_load timestamp without time zone,
     product_id character(10) COLLATE pg_catalog."default",
+	date date,
+    categoria character(200) COLLATE pg_catalog."default",
     CONSTRAINT producto_dim_pkey PRIMARY KEY (id_producto)
 )
 WITH (
@@ -44,12 +46,13 @@ DROP TABLE IF EXISTS public."producto_dia_fact";
 
 CREATE TABLE IF NOT EXISTS public."producto_dia_fact"
 (
-    id_producto integer,
+   id_producto integer,
     id_date integer,
-    precio double precision,
+    price double precision,
     unit_price double precision,
     units integer,
-    discount double precision
+    discount double precision,
+    ts_load timestamp without time zone
 )
 WITH (
     OIDS = FALSE
