@@ -39,7 +39,10 @@ or to scrape the products list file again from the online site. Can be ```False`
   ```Run source/etl/main```
   
 - To install HADOOP, set the next variables:
-  - HADOOP_HOME=[..]\winutils\hadoop-3.0.0
-  - PATH=[..]\winutils\hadoop-3.0.0\bin
-  - PYSPARK_PYTHON=python
-- Download Winutils: https://github.com/steveloughran/winutils
+	```
+    HADOOP_HOME=[..]\winutils\hadoop-3.0.0
+    PATH=[..]\winutils\hadoop-3.0.0\bin
+    PYSPARK_PYTHON=python
+	```
+  
+- Download [Winutils:](https://github.com/steveloughran/winutils)
