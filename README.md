@@ -3,12 +3,14 @@
 Repo for scraping food prices from eCommerce (Supermarket) in order to check inflation and
 order uses.
 
-## Authors:
+## Scraper
+
+### Authors:
 
 - Oscar Promio opromio@uoc.edu
 - Carlos Perez cperezha@uoc.edu
 
-## Files
+### Files
 
 - /source : source code directory
   - main.py : executable module.
@@ -20,7 +22,7 @@ order uses.
 - requirements.txt : python libs.
 - memoria.pdf: memoria del trabajo realizado.
 
-## Usage
+### Usage
 
 Recommended version is Python 3.8. Navigate source directory and Run:
 
@@ -31,11 +33,23 @@ To run start scraping. The process is divided in two steps:
 1. Get a list of the products to scrape from online site and persist it on file.
 2. Iterate the list and get every single product's properties and persist them on file.
 
-`<reload>` parameter indicates wheter to use a previously chached products list file (```products_list.csv```)
-or to scrape the products list file again from the online site. Can be ```False``` for using chached file or 
+`<reload>` parameter indicates wheter to use a previously chached products list file `products_list.csv`
+or to scrape the products list file again from the online site. Can be `False` for using chached file or 
 `True` to reload the list.
 
-## ETL
+## ETL & BI
+
+### Authors:
+
+- Carlos Perez cperezha@uoc.edu
+
+### Source
+
+- source/etl: source code directory
+	- main.py: executable file
+	- ETLFoodScraping.py: ETL code
+
+### Usage
 
 Run
 
