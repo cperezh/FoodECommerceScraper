@@ -31,20 +31,20 @@ To run start scraping. The process is divided in two steps:
 1. Get a list of the products to scrape from online site and persist it on file.
 2. Iterate the list and get every single product's properties and persist them on file.
 
-``` <reload>``` parameter indicates wheter to use a previously chached products list file (```products_list.csv```)
+`<reload>` parameter indicates wheter to use a previously chached products list file (```products_list.csv```)
 or to scrape the products list file again from the online site. Can be ```False``` for using chached file or 
-```True``` to reload the list.
+`True` to reload the list.
 
 ## ETL
 
-```Run source/etl/main```
+Run
+
+	python -m source/etl/main
   
 To install HADOOP, set the next variables:
-
-	```
+	
     HADOOP_HOME=[..]\winutils\hadoop-3.0.0
     PATH=[..]\winutils\hadoop-3.0.0\bin
     PYSPARK_PYTHON=python
-	```
 	
-  Download [Winutils:](https://github.com/steveloughran/winutils)
+Download [Winutils:](https://github.com/steveloughran/winutils)
