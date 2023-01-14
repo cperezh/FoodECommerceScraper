@@ -36,13 +36,15 @@ or to scrape the products list file again from the online site. Can be ```False`
 ```True``` to reload the list.
 
 ## ETL
-  ```Run source/etl/main```
+
+```Run source/etl/main```
   
-- To install HADOOP, set the next variables:
+To install HADOOP, set the next variables:
+
 	```
     HADOOP_HOME=[..]\winutils\hadoop-3.0.0
     PATH=[..]\winutils\hadoop-3.0.0\bin
     PYSPARK_PYTHON=python
 	```
-  
-- Download [Winutils:](https://github.com/steveloughran/winutils)
+	
+  Download [Winutils:](https://github.com/steveloughran/winutils)
