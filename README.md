@@ -41,7 +41,7 @@ or to scrape the products list file again from the online site. Can be `False` f
 
 ### Authors:
 
-- Carlos Perez cperezha@uoc.edu
+- Carlos Perez cperezh@gmail.com
 
 ### Source
 
