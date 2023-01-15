@@ -8,11 +8,12 @@ import pandas as pd
 
 
 @psf.pandas_udf(StringType())
-def split_categorie(categorie_col):
+def split_categoria(categorie_col: pd.Series) -> pd.Series:
+    '''
+    Extrae el primer elemento de la lista de categorias
+    '''
 
-    df = categorie_col.str.extractall(r"'(.)'")[0]
-
-    salida = df.groupby(level=0).agg(lambda x: list(x))
+    salida = categorie_col.apply(lambda x: eval(x)[0])
 
     return salida
 
@@ -54,41 +55,37 @@ class ETLFoodScraping:
         # Nos quedamos con la primera version de cada producto en el dataset,
         # ya que se repiten en todas las fechas
         product_dim_new = dataset\
-            .withColumn("row_number", psf.row_number().over(window_spec))\
+            .withColumn("row_number", psf.row_number().over(window_spec)) \
+            .withColumn("categoria", split_categoria(psf.column("categories")))\
             .where("row_number = 1")\
             .select(["product_id",
                      "product",
+                     "units",
                      "brand",
                      "categories",
+                     "categoria",
                      "date"])
 
         # Obtenemos os productos de base de datos
         product_dim_db = self.sparkDB.read_table("producto_dim")\
             .select(["product_id",
                      "product",
+                     "units",
                      "brand",
                      "categories",
+                     "categoria",
                      "date"])
 
-        # Trim los strings
-        for c in product_dim_db.columns:
-            if type(product_dim_db.schema[c].dataType) == StringType:
-                product_dim_db = product_dim_db.withColumn(c, psf.trim(product_dim_db[c]))
-
         # Obtenemos los productos nuevos, comparando base de datos con dataset
-        product_dim_merge = product_dim_new.exceptAll(product_dim_db)
-
-        pandas = product_dim_merge.pandas_api()
+        p_merge = product_dim_new.exceptAll(product_dim_db)
 
         # Añadimos fecha de carga y las categorias
-        product_dim_merge = product_dim_merge\
+        p_merge = p_merge\
             .withColumn("ts_load", psf.current_timestamp())\
-            .withColumn("categoria", split_categorie(psf.col("categories")))
 
-        print("Productos actualizados: ", product_dim_merge.count())
+        print("Productos actualizados: ", p_merge.count())
 
-        self.sparkDB.write_table(product_dim_merge, "producto_dim", "append")
-
+        self.sparkDB.write_table(p_merge, "producto_dim", "append")
 
     def update_producto_dia_fact(self,  dataset: pyspark.sql.DataFrame):
 
@@ -112,7 +109,6 @@ class ETLFoodScraping:
             .join(date_dim_db, "date", "left")\
             .select(["price",
                      "unit_price",
-                     "units",
                      "discount",
                      "id_producto",
                      "id_date"])
@@ -121,7 +117,6 @@ class ETLFoodScraping:
         producto_dia_fact_db = self.sparkDB.read_table("producto_dia_fact")\
             .select(["price",
                      "unit_price",
-                     "units",
                      "discount",
                      "id_producto",
                      "id_date"])
