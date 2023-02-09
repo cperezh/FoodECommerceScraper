@@ -3,6 +3,10 @@
 Repo for scraping food prices from eCommerce (Supermarket) in order to check inflation and
 order uses.
 
+## Production version
+
+	1.3.0
+
 ## Scraper
 
 ### Authors:

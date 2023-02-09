@@ -56,8 +56,8 @@ class ETLFoodScraping:
         # ya que se repiten en todas las fechas
         product_dim_new = dataset\
             .withColumn("row_number", psf.row_number().over(window_spec)) \
-            .withColumn("categoria", split_categoria(psf.column("categories")))\
-            .where("row_number = 1")\
+            .where("row_number = 1") \
+            .withColumn("categoria", split_categoria(dataset.categories)) \
             .select(["product_id",
                      "product",
                      "units",
@@ -79,7 +79,7 @@ class ETLFoodScraping:
         # Obtenemos los productos nuevos, comparando base de datos con dataset
         p_merge = product_dim_new.exceptAll(product_dim_db)
 
-        # Añadimos fecha de carga y las categorias
+        # Añadimos fecha de carga
         p_merge = p_merge\
             .withColumn("ts_load", psf.current_timestamp())\
 

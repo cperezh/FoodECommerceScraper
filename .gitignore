@@ -12,3 +12,6 @@ logs
 # Virtual env
 venv
 
+# Code execution environments
+environments
+
