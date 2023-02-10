@@ -124,6 +124,11 @@ class ETLFoodScraping:
         # Obtenemos los hechos nuevos, comparando base de datos con dataset
         producto_dia_fact_merge = producto_dia_fact_new.exceptAll(producto_dia_fact_db)
 
+        # Calculamos la variación de precio
+        producto_dia_fact_merge = producto_dia_fact_merge\
+            .join(product_dim_db.select("id_producto"))
+            .withColumn("price_variation", calc_price_var())
+
         # Añadimos fecha de carga
         producto_dia_fact_merge = producto_dia_fact_merge.withColumn("ts_load", psf.current_timestamp())
 
