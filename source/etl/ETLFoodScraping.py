@@ -124,11 +124,6 @@ class ETLFoodScraping:
         # Obtenemos los hechos nuevos, comparando base de datos con dataset
         producto_dia_fact_merge = producto_dia_fact_new.exceptAll(producto_dia_fact_db)
 
-        # Calculamos la variación de precio
-        producto_dia_fact_merge = producto_dia_fact_merge\
-            .join(product_dim_db.select("id_producto"))
-            .withColumn("price_variation", calc_price_var())
-
         # Añadimos fecha de carga
         producto_dia_fact_merge = producto_dia_fact_merge.withColumn("ts_load", psf.current_timestamp())
 
@@ -167,6 +162,35 @@ class ETLFoodScraping:
 
         print("precio_dia_agg_norm_fact creada")
 
+    def test(self, dataset: pyspark.sql.dataframe) -> None:
+
+        pf = self.sparkDB.read_table("producto_dia_fact")
+        pdm = self.sparkDB.read_table("producto_dim")
+        ddm = self.sparkDB.read_table("date_dim")
+
+        pf = pf.alias("pf").join(pdm.alias("pdm"), pf.id_producto == pdm.id_producto, "inner")\
+            .join(ddm.alias("ddm"), pf.id_date == ddm.id_date, "inner")\
+            .select("pdm.id_producto",
+                    "pdm.product",
+                    "ddm.date",
+                    "pf.unit_price")
+
+        # Ventana para ordenar los productos por fecha
+        window_spec = Window \
+            .partitionBy(["id_producto"]) \
+            .orderBy(psf.col("date").asc())
+
+        pf = pf.withColumn("num", psf.row_number().over(window_spec))
+
+        pf = pf.alias("pf1").join(pf.alias("pf2"),
+                                  (psf.col("pf1.id_producto") == psf.col("pf2.id_producto"))
+                                  & (psf.col("pf1.num") == psf.col("pf2.num") + 1),
+                                  "left")
+
+        pf = pf.withColumn("price_variation_day_before", psf.col("pf1.unit_price") - psf.col("pf2.unit_price"))
+
+        pf.select("pf1.*", "pf2.unit_price", "pf2.num", "price_variation_day_before").limit(10).show()
+
     def run(self):
         simple_schema = StructType([
             StructField("date", DateType(), True),
@@ -185,10 +209,12 @@ class ETLFoodScraping:
             .csv("C:\\Users\\Carlos\\Proyectos\\FoodECommerceScraper\\dataset\\dataset.csv",
                  schema=simple_schema, header=True)
 
-        self.update_date_dim(dataset)
+        # self.update_date_dim(dataset)
 
-        self.update_producto_dim(dataset)
+        # self.update_producto_dim(dataset)
 
-        self.update_producto_dia_fact(dataset)
+        # self.update_producto_dia_fact(dataset)
 
-        self.update_precio_dia_norm_fact()
+        # self.update_precio_dia_norm_fact()
+
+        self.test(dataset)
