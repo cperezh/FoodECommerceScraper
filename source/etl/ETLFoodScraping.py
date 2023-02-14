@@ -124,6 +124,8 @@ class ETLFoodScraping:
         # Obtenemos los hechos nuevos, comparando base de datos con dataset
         producto_dia_fact_merge = producto_dia_fact_new.exceptAll(producto_dia_fact_db)
 
+        # TODO Borrar los producto, dia que obtengo en el merge, antes de appendear
+
         # Añadimos fecha de carga
         producto_dia_fact_merge = producto_dia_fact_merge.withColumn("ts_load", psf.current_timestamp())
 
@@ -189,7 +191,15 @@ class ETLFoodScraping:
 
         pf = pf.withColumn("price_variation_day_before", psf.col("pf1.unit_price") - psf.col("pf2.unit_price"))
 
-        pf.select("pf1.*", "pf2.unit_price", "pf2.num", "price_variation_day_before").limit(10).show()
+        pf.select("pf1.*", "pf2.unit_price", "pf2.num", "price_variation_day_before")\
+            .where("price_variation_day_before != 0")\
+            .limit(10).show()
+
+    def test_delete(self):
+
+        productos = "1,2"
+
+        self.sparkDB.spark.sql("delete from producto_dia_fact where id_producto in (0)")
 
     def run(self):
         simple_schema = StructType([
@@ -217,4 +227,6 @@ class ETLFoodScraping:
 
         # self.update_precio_dia_norm_fact()
 
-        self.test(dataset)
+        # self.test(dataset)
+
+        self.test_delete()
