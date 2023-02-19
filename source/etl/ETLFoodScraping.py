@@ -27,8 +27,10 @@ class ETLFoodScraping:
         # obtenemos las nuevas fechas del fichero
         date_dim_new = dataset.select([dataset.date]).distinct()
 
+        prueba = self.sparkDB.spark.read.table("date_dim")
+
         # Obtenemos las fechas en la base de datos
-        date_dim = self.sparkDB.read_table("date_dim").select("date").distinct()
+        date_dim = self.sparkDB.read_table("spark-warehouse/date_dim").select("date").distinct()
 
         # Vemos cuál de las nuevas no está en la base de datos
         data_dim_merge = date_dim_new.exceptAll(date_dim)
