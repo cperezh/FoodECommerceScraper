@@ -1,6 +1,8 @@
 import utils
 from pyspark.sql import SparkSession
 import pyspark.sql
+import pyspark.sql.window
+import pyspark.sql.functions as f
 import delta
 
 
@@ -37,11 +39,24 @@ class SparkDB:
             .format("delta") \
             .saveAsTable(table_name, mode=mode)
 
-    def read_next_seq(self, table_name: str):
+    def read_last_seq(self, table_name: str) -> int:
 
         seq = self.spark.table("sequences_cfg")
 
-        seq.where(f"table_name == {table_name}")
+        seq = seq.where(f"table_name == '{table_name}'")
 
-        seq.show()
+        drama = seq.pandas_api()["id"].iloc[0]
 
+        return int(drama)
+
+    def insert_id(self, df: pyspark.sql.dataframe) -> pyspark.sql.dataframe:
+
+        window_spec = pyspark.sql.window.Window \
+            .orderBy("date")
+
+        seq = self.read_last_seq("date_dim")
+
+        df = df. \
+            withColumn("id", f.row_number().over(window_spec) + seq)
+
+        return df

@@ -1,7 +1,7 @@
 from msilib import schema
 import math
 from SparkDBUtils import SparkDB
-from pyspark.sql.types import DateType, StructType, StructField, IntegerType
+from pyspark.sql.types import DateType, StructType, StructField, IntegerType, TimestampType
 import pyspark.sql.functions as psf
 from pyspark.sql.window import Window
 import datetime as dt
@@ -9,14 +9,14 @@ import datetime as dt
 schema = StructType([\
         StructField("id", IntegerType(), True),\
         StructField("date", DateType(), True),\
-        StructField("timestamp", DateType(), True),\
+        StructField("ts_load", TimestampType(), True),\
         ])
 
 
 def create_db(spark):
 
     sequences_cfg = """
-            CREATE TABLE IF NOT EXISTS sequences_cfg
+            CREATE OR REPLACE TABLE sequences_cfg
             (
                 table_name STRING,
                 id BIGINT,
@@ -27,9 +27,9 @@ def create_db(spark):
     spark.sql(sequences_cfg)
 
     date_dim = """
-        CREATE TABLE IF NOT EXISTS date_dim
+        CREATE OR REPLACE TABLE date_dim
         (
-            id BIGINT,
+            id int,
             date date,
             ts_load timestamp
         ) USING DELTA;
@@ -44,32 +44,18 @@ def create_db(spark):
     spark.sql(conf)
 
 
-def prueba():
-    df = sparkdb.read_table("date_dim")
+def prueba(sparkdb: SparkDB):
 
     df_new = sparkdb.spark.createDataFrame([
         (None, dt.datetime(2020, 5, 17), dt.datetime.now()),
         (None, dt.datetime(2020, 5, 25), dt.datetime.now())],
         schema=schema)
 
-    maxim = df.pandas_api()["id_date"].max()
-
-    if math.isnan(maxim):
-        maxim = 0
-
-    window_spec = Window \
-        .orderBy("date")
-
-    df_new = df_new. \
-        withColumn("id_date", psf.row_number().over(window_spec) + maxim)
+    df_new = sparkdb.insert_id(df_new)
 
     df_new.show()
 
-    df = df.union(df_new)
-
-    df.show()
-
-    sparkdb.write_table(df, "date_dim", "append")
+    sparkdb.write_table(df_new, "date_dim", "append")
 
     sparkdb.read_table("date_dim").show()
 
@@ -80,11 +66,4 @@ if __name__ == "__main__":
 
     # create_db(sparkdb.spark)
 
-    seq = sparkdb.read_next_seq("date_dim")
-
-    seq.show()
-
-    # data = spark.range(0, 5)
-    # data.write.format("delta").saveAsTable("data_dim")
-
-    # spark.sql("select * from date_dim")
+    prueba(sparkdb)
