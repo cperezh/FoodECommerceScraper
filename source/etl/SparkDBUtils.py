@@ -1,10 +1,9 @@
-import utils
 from pyspark.sql import SparkSession
 import pyspark.sql
 import pyspark.sql.window
 import pyspark.sql.functions as f
 import delta
-
+import utils
 
 class SparkDB:
 
@@ -45,18 +44,38 @@ class SparkDB:
 
         seq = seq.where(f"table_name == '{table_name}'")
 
-        drama = seq.pandas_api()["id"].iloc[0]
+        last_seq = seq.pandas_api()["id"].iloc[0]
 
-        return int(drama)
+        return int(last_seq)
 
-    def insert_id(self, df: pyspark.sql.dataframe) -> pyspark.sql.dataframe:
+    def update_last_seq(self, df: pyspark.sql.dataframe, table_name: str):
 
+        # Obtenemos la nueva ultima secuencia
+        last_seq = df.pandas_api()["id"].max()
+
+        # Actualizamos en la tabla de secuencias
+        self.spark.sql(f"""
+                    update sequences_cfg set id={last_seq} 
+                    where table_name == '{table_name}'
+                    """)
+
+    def insert_id(self, df: pyspark.sql.dataframe, table_name: str) -> pyspark.sql.dataframe:
+        """
+         Inserta en df una columna 'id' con enteros consecutivos, desde la
+         ultima secuencia que se entregó para la table_name.
+        """
+
+        # Ventana por cualquier columna, para poder usar row_number
         window_spec = pyspark.sql.window.Window \
-            .orderBy("date")
+            .orderBy(df.columns[0])
 
-        seq = self.read_last_seq("date_dim")
+        # Obtenemos la ultima secuencia que se utilizó
+        seq = self.read_last_seq(table_name)
 
+        # Actualizamos la columna id con secuenciales desde la ultima secuencia
         df = df. \
             withColumn("id", f.row_number().over(window_spec) + seq)
+
+        self.update_last_seq(df, table_name)
 
         return df
