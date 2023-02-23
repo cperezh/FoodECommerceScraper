@@ -29,7 +29,7 @@ def create_db(spark):
     date_dim = """
         CREATE OR REPLACE TABLE date_dim
         (
-            id int,
+            id_date int,
             date date,
             ts_load timestamp
         ) USING DELTA;
@@ -44,26 +44,8 @@ def create_db(spark):
     spark.sql(conf)
 
 
-def prueba(sparkdb: SparkDB):
-
-    df_new = sparkdb.spark.createDataFrame([
-        (None, dt.datetime(2020, 5, 17), dt.datetime.now()),
-        (None, dt.datetime(2020, 5, 25), dt.datetime.now())],
-        schema=schema)
-
-    df_new = sparkdb.insert_id(df_new)
-
-    df_new.show()
-
-    sparkdb.write_table(df_new, "date_dim", "append")
-
-    sparkdb.read_table("date_dim").show()
-
-
 if __name__ == "__main__":
 
     sparkdb = SparkDB()
 
     create_db(sparkdb.spark)
-
-    # prueba(sparkdb)

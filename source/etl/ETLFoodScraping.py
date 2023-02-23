@@ -39,7 +39,7 @@ class ETLFoodScraping:
         print("Fechas actualizadas: " + str(data_dim_merge.count()))
 
         # Actializamos la base de datos.
-        self.sparkDB.write_table(data_dim_merge, "date_dim", "append", True)
+        self.sparkDB.write_table(data_dim_merge, "date_dim", "append", "id_date")
 
     def update_producto_dim(self, dataset: pyspark.sql.DataFrame):
 

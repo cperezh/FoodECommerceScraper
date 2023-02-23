@@ -5,6 +5,7 @@ import pyspark.sql.functions as f
 import delta
 import utils
 
+
 class SparkDB:
 
     __builder = SparkSession\
@@ -31,11 +32,11 @@ class SparkDB:
     def write_table(self, df: pyspark.sql.DataFrame,
                     table_name: str,
                     mode: str,
-                    has_id: bool):
+                    id_column: bool = None):
 
         # si la tabla tiene "id", lo actualizo
-        if has_id:
-            df = self.insert_id(df, table_name)
+        if id_column is not None:
+            df = self.insert_id(df, table_name, id_column)
 
         # Saving data
         df.write \
@@ -52,10 +53,10 @@ class SparkDB:
 
         return int(last_seq)
 
-    def update_last_seq(self, df: pyspark.sql.dataframe, table_name: str):
+    def update_last_seq(self, df: pyspark.sql.dataframe, table_name: str, id_column: str):
 
         # Obtenemos la nueva ultima secuencia
-        last_seq = df.pandas_api()["id"].max()
+        last_seq = df.pandas_api()[id_column].max()
 
         # Actualizamos en la tabla de secuencias
         self.spark.sql(f"""
@@ -63,7 +64,7 @@ class SparkDB:
                     where table_name == '{table_name}'
                     """)
 
-    def insert_id(self, df: pyspark.sql.dataframe, table_name: str) -> pyspark.sql.dataframe:
+    def insert_id(self, df: pyspark.sql.dataframe, table_name: str, id_column: str) -> pyspark.sql.dataframe:
         """
          Inserta en df una columna 'id' con enteros consecutivos, desde la
          ultima secuencia que se entregó para la table_name.
@@ -78,8 +79,8 @@ class SparkDB:
 
         # Actualizamos la columna id con secuenciales desde la ultima secuencia
         df = df. \
-            withColumn("id", f.row_number().over(window_spec) + seq)
+            withColumn(id_column, f.row_number().over(window_spec) + seq)
 
-        self.update_last_seq(df, table_name)
+        self.update_last_seq(df, table_name, id_column)
 
         return df
