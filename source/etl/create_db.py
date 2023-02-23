@@ -64,6 +64,6 @@ if __name__ == "__main__":
 
     sparkdb = SparkDB()
 
-    # create_db(sparkdb.spark)
+    create_db(sparkdb.spark)
 
-    prueba(sparkdb)
+    # prueba(sparkdb)

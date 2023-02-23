@@ -3,7 +3,7 @@ from pyspark.sql.window import Window
 import pyspark.sql.functions as psf
 from pyspark.sql.types import StructType, StructField, DateType, \
     StringType, FloatType, TimestampType, ArrayType
-from SparkDBUtils import SparkDBUtils
+from SparkDBUtils import SparkDB
 import pandas as pd
 
 
@@ -21,16 +21,14 @@ def split_categoria(categorie_col: pd.Series) -> pd.Series:
 class ETLFoodScraping:
 
     def __init__(self):
-        self.sparkDB = SparkDBUtils()
+        self.sparkDB = SparkDB()
 
     def update_date_dim(self, dataset: pyspark.sql.DataFrame):
         # obtenemos las nuevas fechas del fichero
         date_dim_new = dataset.select([dataset.date]).distinct()
 
-        prueba = self.sparkDB.spark.read.table("date_dim")
-
         # Obtenemos las fechas en la base de datos
-        date_dim = self.sparkDB.read_table("spark-warehouse/date_dim").select("date").distinct()
+        date_dim = self.sparkDB.read_table("date_dim").select("date").distinct()
 
         # Vemos cuál de las nuevas no está en la base de datos
         data_dim_merge = date_dim_new.exceptAll(date_dim)
@@ -41,8 +39,7 @@ class ETLFoodScraping:
         print("Fechas actualizadas: " + str(data_dim_merge.count()))
 
         # Actializamos la base de datos.
-
-        self.sparkDB.write_table(data_dim_merge, "date_dim", "append")
+        self.sparkDB.write_table(data_dim_merge, "date_dim", "append", True)
 
     def update_producto_dim(self, dataset: pyspark.sql.DataFrame):
 
@@ -184,8 +181,8 @@ class ETLFoodScraping:
 
         self.update_date_dim(dataset)
 
-        self.update_producto_dim(dataset)
+        # self.update_producto_dim(dataset)
 
-        self.update_producto_dia_fact(dataset)
+        # self.update_producto_dia_fact(dataset)
 
-        self.update_precio_dia_norm_fact()
+        # self.update_precio_dia_norm_fact()

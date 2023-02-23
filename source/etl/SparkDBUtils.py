@@ -21,8 +21,6 @@ class SparkDB:
 
     def read_table(self, table_name: str) -> pyspark.sql.DataFrame:
 
-        aaa = self.spark.sparkContext.getConf().get("spark.sql.warehouse.dir")
-
         df = self.spark.read.table(table_name)
 
         # Hago trim a los string que vienen de base de datos
@@ -30,8 +28,14 @@ class SparkDB:
 
         return df
 
-    @staticmethod
-    def write_table(df: pyspark.sql.DataFrame, table_name: str, mode: str):
+    def write_table(self, df: pyspark.sql.DataFrame,
+                    table_name: str,
+                    mode: str,
+                    has_id: bool):
+
+        # si la tabla tiene "id", lo actualizo
+        if has_id:
+            df = self.insert_id(df, table_name)
 
         # Saving data
         df.write \
