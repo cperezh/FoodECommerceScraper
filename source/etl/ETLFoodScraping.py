@@ -84,7 +84,7 @@ class ETLFoodScraping:
 
         print("Productos actualizados: ", p_merge.count())
 
-        self.sparkDB.write_table(p_merge, "producto_dim", "append")
+        self.sparkDB.write_table(p_merge, "producto_dim", "append", "id_producto")
 
     def update_producto_dia_fact(self,  dataset: pyspark.sql.DataFrame):
 
@@ -181,8 +181,8 @@ class ETLFoodScraping:
 
         self.update_date_dim(dataset)
 
-        # self.update_producto_dim(dataset)
+        self.update_producto_dim(dataset)
 
-        # self.update_producto_dia_fact(dataset)
+        self.update_producto_dia_fact(dataset)
 
-        # self.update_precio_dia_norm_fact()
+        self.update_precio_dia_norm_fact()

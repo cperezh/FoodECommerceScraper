@@ -1,9 +1,13 @@
+import logging
+
 from pyspark.sql import SparkSession
+from pyspark.context import SparkContext
 import pyspark.sql
 import pyspark.sql.window
 import pyspark.sql.functions as f
 import delta
 import utils
+import logging
 
 
 class SparkDB:
@@ -20,6 +24,8 @@ class SparkDB:
     spark = delta.configure_spark_with_delta_pip(__builder)\
         .getOrCreate()
 
+    spark.sparkContext.setLogLevel("ERROR")
+
     def read_table(self, table_name: str) -> pyspark.sql.DataFrame:
 
         df = self.spark.read.table(table_name)
@@ -34,14 +40,17 @@ class SparkDB:
                     mode: str,
                     id_column: bool = None):
 
-        # si la tabla tiene "id", lo actualizo
-        if id_column is not None:
-            df = self.insert_id(df, table_name, id_column)
+        # Si hay elementos en el dataframe
+        if df.count() != 0:
 
-        # Saving data
-        df.write \
-            .format("delta") \
-            .saveAsTable(table_name, mode=mode)
+            # si la tabla tiene "id", lo actualizo
+            if id_column is not None:
+                df = self.insert_id(df, table_name, id_column)
+
+            # Saving data
+            df.write \
+                .format("delta") \
+                .saveAsTable(table_name, mode=mode)
 
     def read_last_seq(self, table_name: str) -> int:
 

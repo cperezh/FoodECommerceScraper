@@ -1,16 +1,6 @@
-from msilib import schema
-import math
 from SparkDBUtils import SparkDB
 from pyspark.sql.types import DateType, StructType, StructField, IntegerType, TimestampType
-import pyspark.sql.functions as psf
-from pyspark.sql.window import Window
 import datetime as dt
-
-schema = StructType([\
-        StructField("id", IntegerType(), True),\
-        StructField("date", DateType(), True),\
-        StructField("ts_load", TimestampType(), True),\
-        ])
 
 
 def create_db(spark):
@@ -42,6 +32,60 @@ def create_db(spark):
     """
 
     spark.sql(conf)
+
+    product_dim = """
+            CREATE OR REPLACE TABLE producto_dim
+            (
+                id_producto int,
+                product string,
+                brand string,
+                categories string,
+                product_id string,
+                date date,
+                categoria string,
+                units string,
+                ts_load timestamp
+            ) USING DELTA;
+            """
+
+    spark.sql(product_dim)
+
+    conf = f"""
+            INSERT INTO sequences_cfg VALUES('producto_dim',0,'{dt.datetime.now()}')
+        """
+
+    spark.sql(conf)
+
+    producto_dia_fact = """
+                CREATE OR REPLACE TABLE producto_dia_fact
+                (
+                    id_producto int,
+                    id_date int,
+                    price double,
+                    unit_price double,
+                    discount double,
+                    ts_load timestamp
+                ) USING DELTA;
+                """
+
+    spark.sql(producto_dia_fact)
+
+    precio_dia_agg_norm_fact = """
+                    CREATE OR REPLACE TABLE precio_dia_agg_norm_fact
+                    (
+                        id_date int,
+                        sum_price double,
+                        sum_unit_price double,
+                        num_products long,
+                        sum_price_ponderado double,
+                        sum_unit_price_ponderado double,
+                        sum_price_norm double,
+                        sum_unit_price_norm double,
+                        ts_load timestamp
+                    ) USING DELTA;
+                    """
+
+    spark.sql(precio_dia_agg_norm_fact)
 
 
 if __name__ == "__main__":
