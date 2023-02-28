@@ -1,13 +1,9 @@
-import logging
-
 from pyspark.sql import SparkSession
-from pyspark.context import SparkContext
 import pyspark.sql
 import pyspark.sql.window
 import pyspark.sql.functions as f
 import delta
 import utils
-import logging
 
 
 class SparkDB:
@@ -17,8 +13,8 @@ class SparkDB:
         .appName("FoodScraper with Delta") \
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
         .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")\
-        .config("spark.sql.warehouse.dir","c:/tmp/spark-warehouse")\
-        .config("javax.jdo.option.ConnectionURL","jdbc:derby:;databaseName=C:/tmp/metastore_db;create=true")\
+        .config("spark.sql.warehouse.dir", "c:/tmp/spark-warehouse")\
+        .config("javax.jdo.option.ConnectionURL", "jdbc:derby:;databaseName=C:/tmp/metastore_db;create=true")\
         .enableHiveSupport()
 
     spark = delta.configure_spark_with_delta_pip(__builder)\
@@ -38,7 +34,7 @@ class SparkDB:
     def write_table(self, df: pyspark.sql.DataFrame,
                     table_name: str,
                     mode: str,
-                    id_column: bool = None):
+                    id_column: str = None):
 
         # Si hay elementos en el dataframe
         if df.count() != 0:
