@@ -2,16 +2,17 @@ import pyspark.sql
 from pyspark.sql.window import Window
 import pyspark.sql.functions as psf
 from pyspark.sql.types import StructType, StructField, DateType, \
-    StringType, FloatType, TimestampType, ArrayType
-from SparkDBUtils import SparkDBUtils
+    StringType, FloatType, TimestampType
+from SparkDBUtils import SparkDB
 import pandas as pd
+import logging
 
 
 @psf.pandas_udf(StringType())
 def split_categoria(categorie_col: pd.Series) -> pd.Series:
-    '''
+    """
     Extrae el primer elemento de la lista de categorias
-    '''
+    """
 
     salida = categorie_col.apply(lambda x: eval(x)[0])
 
@@ -19,11 +20,30 @@ def split_categoria(categorie_col: pd.Series) -> pd.Series:
 
 
 class ETLFoodScraping:
+    """
+    Execute run method to run ETL procecess
+    """
+
+    simple_schema = StructType([
+        StructField("date", DateType(), True),
+        StructField("product", StringType(), True),
+        StructField("product_id", StringType(), True),
+        StructField("brand", StringType(), True),
+        StructField("price", FloatType(), True),
+        StructField("categories", StringType(), True),
+        StructField("unit_price", FloatType(), True),
+        StructField("units", StringType(), True),
+        StructField("discount", FloatType(), True),
+        StructField("ts_load", TimestampType(), True)
+    ])
 
     def __init__(self):
-        self.sparkDB = SparkDBUtils()
+        self.sparkDB = SparkDB()
 
     def update_date_dim(self, dataset: pyspark.sql.DataFrame):
+
+        logging.getLogger(__name__).info("Start update_date_dim")
+
         # obtenemos las nuevas fechas del fichero
         date_dim_new = dataset.select([dataset.date]).distinct()
 
@@ -36,13 +56,14 @@ class ETLFoodScraping:
         # Incluimos el Timestamp
         data_dim_merge = data_dim_merge.withColumn("ts_load", psf.current_timestamp())
 
-        print("Fechas actualizadas: " + str(data_dim_merge.count()))
+        logging.getLogger(__name__).info("Fechas actualizadas: " + str(data_dim_merge.count()))
 
         # Actializamos la base de datos.
-
-        self.sparkDB.write_table(data_dim_merge, "date_dim", "append")
+        self.sparkDB.write_table(data_dim_merge, "date_dim", "append", "id_date")
 
     def update_producto_dim(self, dataset: pyspark.sql.DataFrame):
+
+        logging.getLogger(__name__).info("Start update_producto_dim")
 
         # Ventana para obtener la primera version de cada producto
         window_spec = Window\
@@ -83,11 +104,13 @@ class ETLFoodScraping:
         p_merge = p_merge\
             .withColumn("ts_load", psf.current_timestamp())\
 
-        print("Productos actualizados: ", p_merge.count())
+        logging.getLogger(__name__).info("Productos actualizados: " + str(p_merge.count()))
 
-        self.sparkDB.write_table(p_merge, "producto_dim", "append")
+        self.sparkDB.write_table(p_merge, "producto_dim", "append", "id_producto")
 
     def update_producto_dia_fact(self,  dataset: pyspark.sql.DataFrame):
+
+        logging.getLogger(__name__).info("Start update_producto_dia_fact")
 
         # Ventana para obtener la ultima version de cada producto
         window_spec = Window \
@@ -127,11 +150,13 @@ class ETLFoodScraping:
         # Añadimos fecha de carga
         producto_dia_fact_merge = producto_dia_fact_merge.withColumn("ts_load", psf.current_timestamp())
 
-        print("Hechos actualizados: ", producto_dia_fact_merge.count())
+        logging.getLogger(__name__).info("Hechos actualizados: " + str(producto_dia_fact_merge.count()))
 
         self.sparkDB.write_table(producto_dia_fact_merge, "producto_dia_fact", "append")
 
     def update_precio_dia_norm_fact(self):
+
+        logging.getLogger(__name__).info("Start update_precio_dia_norm_fact")
 
         producto_dia_fact = self.sparkDB.read_table("producto_dia_fact")
 
@@ -160,25 +185,20 @@ class ETLFoodScraping:
 
         self.sparkDB.write_table(precio_dia_agg_norm_fact, "precio_dia_agg_norm_fact", "overwrite")
 
-        print("precio_dia_agg_norm_fact creada")
+        logging.getLogger(__name__).info("precio_dia_agg_norm_fact creada")
 
-    def run(self):
-        simple_schema = StructType([
-            StructField("date", DateType(), True),
-            StructField("product", StringType(), True),
-            StructField("product_id", StringType(), True),
-            StructField("brand", StringType(), True),
-            StructField("price", FloatType(), True),
-            StructField("categories", StringType(), True),
-            StructField("unit_price", FloatType(), True),
-            StructField("units", StringType(), True),
-            StructField("discount", FloatType(), True),
-            StructField("ts_load", TimestampType(), True)
-        ])
+    def read(self) -> pyspark.sql.dataframe:
+
+        logging.getLogger(__name__).info("Read dataset")
 
         dataset = self.sparkDB.spark.read.option("delimiter", ";") \
-            .csv("C:\\Users\\Carlos\\Proyectos\\FoodECommerceScraper\\dataset\\dataset.csv",
-                 schema=simple_schema, header=True)
+            .csv("../../dataset/dataset.csv", schema=self.simple_schema, header=True)
+
+        return dataset
+
+    def load_dwh(self, dataset: pyspark.sql.dataframe):
+
+        logging.getLogger(__name__).info("Start Load DWH")
 
         self.update_date_dim(dataset)
 
@@ -187,3 +207,39 @@ class ETLFoodScraping:
         self.update_producto_dia_fact(dataset)
 
         self.update_precio_dia_norm_fact()
+
+    def export_dwh(self):
+
+        logging.getLogger(__name__).info("Start export_dwh")
+
+        self.sparkDB.spark.table("date_dim")\
+            .toPandas()\
+            .to_csv("c:/tmp/extract/date_dim.csv",
+                    index=False, sep=";", decimal=",")
+
+        self.sparkDB.spark.table("producto_dim") \
+            .toPandas() \
+            .to_csv("c:/tmp/extract/producto_dim.csv",
+                    index=False, sep=";", decimal=",")
+
+        self.sparkDB.spark.table("producto_dia_fact") \
+            .toPandas() \
+            .to_csv("c:/tmp/extract/producto_dia_fact.csv",
+                    index=False, sep=";", decimal=",")
+
+        self.sparkDB.spark.table("precio_dia_agg_norm_fact") \
+            .toPandas() \
+            .to_csv("c:/tmp/extract/precio_dia_agg_norm_fact.csv",
+                    index=False, sep=";", decimal=",")
+
+    def run(self):
+
+        logging.getLogger(__name__).info("Comienza ETL FoodScraping")
+
+        dataset = self.read()
+
+        # self.load_dwh(dataset)
+
+        self.export_dwh()
+
+        logging.getLogger(__name__).info("Finaliza ETL FoodScraping: SUCCESS")

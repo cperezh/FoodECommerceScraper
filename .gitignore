@@ -16,3 +16,5 @@ venv
 environments
 
 derby.log
+
+.ipynb_checkpoints
