@@ -214,19 +214,23 @@ class ETLFoodScraping:
 
         self.sparkDB.spark.table("date_dim")\
             .toPandas()\
-            .to_csv("c:/tmp/extract/date_dim.csv", index=False)
+            .to_csv("c:/tmp/extract/date_dim.csv",
+                    index=False, sep=";", decimal=",")
 
         self.sparkDB.spark.table("producto_dim") \
             .toPandas() \
-            .to_csv("c:/tmp/extract/producto_dim.csv", index=False)
+            .to_csv("c:/tmp/extract/producto_dim.csv",
+                    index=False, sep=";", decimal=",")
 
         self.sparkDB.spark.table("producto_dia_fact") \
             .toPandas() \
-            .to_csv("c:/tmp/extract/producto_dia_fact.csv", index=False)
+            .to_csv("c:/tmp/extract/producto_dia_fact.csv",
+                    index=False, sep=";", decimal=",")
 
         self.sparkDB.spark.table("precio_dia_agg_norm_fact") \
             .toPandas() \
-            .to_csv("c:/tmp/extract/precio_dia_agg_norm_fact.csv", index=False)
+            .to_csv("c:/tmp/extract/precio_dia_agg_norm_fact.csv",
+                    index=False, sep=";", decimal=",")
 
     def run(self):
 
