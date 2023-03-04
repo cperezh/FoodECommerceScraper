@@ -97,7 +97,7 @@ class ETLFoodScraping:
                      "categoria",
                      "date"])
 
-        # Obtenemos los productos nuevos, comparando base de datos con dataset
+        # Obtenemos los productos con diferencias, comparando base de datos con dataset
         p_merge = product_dim_new.exceptAll(product_dim_db)
 
         # Añadimos fecha de carga
