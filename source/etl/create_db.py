@@ -21,6 +21,7 @@ def create_db(spark):
         (
             id_date int,
             date date,
+            year int,
             ts_load timestamp
         ) USING DELTA;
         """
@@ -64,8 +65,10 @@ def create_db(spark):
                     price double,
                     unit_price double,
                     discount double,
+                    year int,
                     ts_load timestamp
-                ) USING DELTA;
+                ) USING DELTA
+                PARTITIONED BY (year)
                 """
 
     spark.sql(producto_dia_fact)
