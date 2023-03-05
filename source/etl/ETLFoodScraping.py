@@ -1,3 +1,5 @@
+import datetime
+
 import pyspark.sql
 from pyspark.sql.window import Window
 import pyspark.sql.functions as psf
@@ -6,6 +8,7 @@ from pyspark.sql.types import StructType, StructField, DateType, \
 from SparkDBUtils import SparkDB
 import pandas as pd
 import logging
+from delta import DeltaTable
 
 
 @psf.pandas_udf(StringType())
@@ -63,19 +66,16 @@ class ETLFoodScraping:
         # Actializamos la base de datos.
         self.sparkDB.write_table(data_dim_merge, "date_dim", "append", "id_date")
 
-    def update_producto_dim(self, dataset: pyspark.sql.DataFrame):
+    def update_producto_dim(self, dataset: pyspark.sql.DataFrame, year: int):
 
         logging.getLogger(__name__).info("Start update_producto_dim")
 
-        # Ventana para obtener la primera version de cada producto
+        # Ventana para obtener la ultima version de cada producto
         window_spec = Window\
-            .partitionBy(["product_id",
-                          "product",
-                          "brand",
-                          "categories"])\
-            .orderBy(psf.col("date"))
+            .partitionBy("product_id")\
+            .orderBy(psf.col("date").desc())
 
-        # Nos quedamos con la primera version de cada producto en el dataset,
+        # Nos quedamos con la ultima version de cada producto en el dataset,
         # ya que se repiten en todas las fechas
         product_dim_new = dataset\
             .withColumn("row_number", psf.row_number().over(window_spec)) \
@@ -90,7 +90,7 @@ class ETLFoodScraping:
                      "date"])
 
         # Obtenemos os productos de base de datos
-        product_dim_db = self.sparkDB.read_table("producto_dim")\
+        product_dim_db = DeltaTable.forName(self.sparkDB.spark, "producto_dim")\
             .select(["product_id",
                      "product",
                      "units",
@@ -100,7 +100,8 @@ class ETLFoodScraping:
                      "date"])
 
         # Obtenemos los productos con diferencias, comparando base de datos con dataset
-        p_merge = product_dim_new.exceptAll(product_dim_db)
+        # p_merge = product_dim_new.exceptAll(product_dim_db)
+
 
         # Añadimos fecha de carga
         p_merge = p_merge\
@@ -110,7 +111,7 @@ class ETLFoodScraping:
 
         self.sparkDB.write_table(p_merge, "producto_dim", "append", "id_producto")
 
-    def update_producto_dia_fact(self,  dataset: pyspark.sql.DataFrame):
+    def update_producto_dia_fact(self,  dataset: pyspark.sql.DataFrame, year: int):
 
         logging.getLogger(__name__).info("Start update_producto_dia_fact")
 
@@ -123,7 +124,7 @@ class ETLFoodScraping:
             .withColumn("row_number", psf.row_number().over(window_spec)) \
             .where("row_number = 1") \
             .select(["product_id",
-                     "id_producto"])
+                     "id_producto"])\
 
         # tabla de fechas para hacer el lookup
         date_dim_db = self.sparkDB.read_table("date_dim").select(["date", "id_date", "year"])
@@ -205,11 +206,13 @@ class ETLFoodScraping:
 
         logging.getLogger(__name__).info("Start Load DWH")
 
+        year = datetime.date.today().year
+
         self.update_date_dim(dataset)
 
         self.update_producto_dim(dataset)
 
-        self.update_producto_dia_fact(dataset)
+        self.update_producto_dia_fact(dataset, year)
 
         self.update_precio_dia_norm_fact()
 
