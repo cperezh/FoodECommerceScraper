@@ -53,8 +53,10 @@ class ETLFoodScraping:
         # Vemos cuál de las nuevas no está en la base de datos
         data_dim_merge = date_dim_new.exceptAll(date_dim)
 
-        # Incluimos el Timestamp
-        data_dim_merge = data_dim_merge.withColumn("ts_load", psf.current_timestamp())
+        # Incluimos el Timestamp y el año
+        data_dim_merge = data_dim_merge\
+            .withColumn("ts_load", psf.current_timestamp())\
+            .withColumn("year", psf.year("date"))
 
         logging.getLogger(__name__).info("Fechas actualizadas: " + str(data_dim_merge.count()))
 
@@ -124,17 +126,18 @@ class ETLFoodScraping:
                      "id_producto"])
 
         # tabla de fechas para hacer el lookup
-        date_dim_db = self.sparkDB.read_table("date_dim").select(["date", "id_date"])
+        date_dim_db = self.sparkDB.read_table("date_dim").select(["date", "id_date", "year"])
 
         # obtengo los hechos del fichero
         producto_dia_fact_new = dataset\
-            .join(product_dim_db, "product_id", "left")\
-            .join(date_dim_db, "date", "left")\
+            .join(product_dim_db.alias("p"), "product_id", "left")\
+            .join(date_dim_db.alias("d"), "date", "left")\
             .select(["price",
                      "unit_price",
                      "discount",
                      "id_producto",
-                     "id_date"])
+                     "id_date",
+                     "d.year"])
 
         # Obtengo los hechos de base de datos
         producto_dia_fact_db = self.sparkDB.read_table("producto_dia_fact")\
@@ -142,13 +145,15 @@ class ETLFoodScraping:
                      "unit_price",
                      "discount",
                      "id_producto",
-                     "id_date"])
+                     "id_date",
+                     "year"])
 
         # Obtenemos los hechos nuevos, comparando base de datos con dataset
         producto_dia_fact_merge = producto_dia_fact_new.exceptAll(producto_dia_fact_db)
 
-        # Añadimos fecha de carga
-        producto_dia_fact_merge = producto_dia_fact_merge.withColumn("ts_load", psf.current_timestamp())
+        # Añadimos fecha de carga y el año de particionado
+        producto_dia_fact_merge = producto_dia_fact_merge\
+            .withColumn("ts_load", psf.current_timestamp())\
 
         logging.getLogger(__name__).info("Hechos actualizados: " + str(producto_dia_fact_merge.count()))
 
