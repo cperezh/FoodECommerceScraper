@@ -238,7 +238,7 @@ class ETLFoodScraping:
 
         dataset = self.read()
 
-        # self.load_dwh(dataset)
+        self.load_dwh(dataset)
 
         self.export_dwh()
 
