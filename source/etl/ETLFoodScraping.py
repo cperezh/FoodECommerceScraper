@@ -101,7 +101,20 @@ class ETLFoodScraping:
 
         # Obtenemos los productos con diferencias, comparando base de datos con dataset
         # p_merge = product_dim_new.exceptAll(product_dim_db)
-
+        product_dim_db.alias('p') \
+            .merge(product_dim_new.alias('n'), 'p.product_id = n.product_id')\
+            .whenMatchedUpdate(set=
+                {
+                  "id": "updates.id",
+                  "firstName": "updates.firstName",
+                  "middleName": "updates.middleName",
+                  "lastName": "updates.lastName",
+                  "gender": "updates.gender",
+                  "birthDate": "updates.birthDate",
+                  "ssn": "updates.ssn",
+                  "salary": "updates.salary"
+                }
+              )
 
         # Añadimos fecha de carga
         p_merge = p_merge\
