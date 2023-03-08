@@ -89,3 +89,17 @@ class SparkDB:
         self.update_last_seq(df, table_name, id_column)
 
         return df
+
+    def get_next_seq(self,  table_name: str):
+
+        last_seq = self.read_last_seq()
+
+        # Actualizamos en la tabla de secuencias
+        self.spark.sql(f"""
+                       update sequences_cfg set id={last_seq + 1} 
+                       where table_name == '{table_name}'
+                       """)
+
+        return last_seq
+
+

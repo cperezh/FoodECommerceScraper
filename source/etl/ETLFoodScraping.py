@@ -103,26 +103,32 @@ class ETLFoodScraping:
         # p_merge = product_dim_new.exceptAll(product_dim_db)
         product_dim_db.alias('p') \
             .merge(product_dim_new.alias('n'), 'p.product_id = n.product_id')\
-            .whenMatchedUpdate(set=
-                {
-                  "id": "updates.id",
-                  "firstName": "updates.firstName",
-                  "middleName": "updates.middleName",
-                  "lastName": "updates.lastName",
-                  "gender": "updates.gender",
-                  "birthDate": "updates.birthDate",
-                  "ssn": "updates.ssn",
-                  "salary": "updates.salary"
+            .whenMatchedUpdate(set={
+                "product": "n.product",
+                "units": "n.units",
+                "brand": "n.brand",
+                "gender": "n.gender",
+                "categories": "n.categories",
+                "categoria": "n.categoria",
+                "date": "n.date",
+                "ts_load": psf.current_timestamp()
                 }
-              )
+            ) \
+            .whenNotMatchedInsert(values={
+                "id_producto": self.sparkDB.get_next_seq("producto_dim"),
+                "product": "n.product",
+                "units": "n.units",
+                "brand": "n.brand",
+                "gender": "n.gender",
+                "categories": "n.categories",
+                "categoria": "n.categoria",
+                "date": "n.date",
+                "ts_load": psf.current_timestamp()
+                }
+            ) \
+            .execute()
 
-        # Añadimos fecha de carga
-        p_merge = p_merge\
-            .withColumn("ts_load", psf.current_timestamp())\
-
-        logging.getLogger(__name__).info("Productos actualizados: " + str(p_merge.count()))
-
-        self.sparkDB.write_table(p_merge, "producto_dim", "append", "id_producto")
+        logging.getLogger(__name__).info("Productos actualizados: " + str(product_dim_new.count()))
 
     def update_producto_dia_fact(self,  dataset: pyspark.sql.DataFrame, year: int):
 
@@ -221,13 +227,13 @@ class ETLFoodScraping:
 
         year = datetime.date.today().year
 
-        self.update_date_dim(dataset)
+        # self.update_date_dim(dataset)
 
         self.update_producto_dim(dataset)
 
-        self.update_producto_dia_fact(dataset, year)
+        # self.update_producto_dia_fact(dataset, year)
 
-        self.update_precio_dia_norm_fact()
+        # self.update_precio_dia_norm_fact()
 
     def export_dwh(self):
 
