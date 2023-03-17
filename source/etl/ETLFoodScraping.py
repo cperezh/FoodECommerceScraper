@@ -70,18 +70,40 @@ class ETLFoodScraping:
 
         logging.getLogger(__name__).info("Start update_producto_dim")
 
+        # Ventana para obtener la ultima version de cada producto
+        window_spec = Window \
+            .partitionBy("product_id") \
+            .orderBy(psf.col("date").desc())
+
+        # Nos quedamos con la ultimaer version de cada producto en el dataset,
+        # ya que se repiten en todas las fechas
+        dataset_ultimos = dataset \
+            .withColumn("row_number", psf.row_number().over(window_spec)) \
+            .where("row_number = 1") \
+            .withColumn("categoria", split_categoria(dataset.categories)) \
+            .select(["product_id",
+                     "product",
+                     "units",
+                     "brand",
+                     "categories",
+                     "categoria",
+                     "date"])
+
         # Carlos los registros en base de datos
         db = self.sparkDB.spark.table("producto_dim").alias("db")
 
         # Seleccion los del dataset que no están en base de datos
-        nuevos = dataset.alias("dt").join(db, "product_id", "left").where("db.id_producto is null").select("dt.*")
+        nuevos = dataset_ultimos.alias("dt")\
+            .join(db, "product_id", "left")\
+            .where("db.id_producto is null")\
+            .select("dt.*")
 
         # Inserto el id a los nuevos y el timestamp
         nuevos = self.sparkDB.insert_id(nuevos, "producto_dim", "id_producto")\
             .withColumn("ts_load", psf.current_timestamp()) \
 
         # Obtengo los del dataset que si que están en base de datos
-        estan = dataset.join(db.select(["product_id", "id_producto"]), "product_id", "inner")
+        estan = dataset_ultimos.join(db.select(["product_id", "id_producto"]), "product_id", "inner")
 
         # Inserto los nuevos
         nuevos.write.format("delta").saveAsTable("producto_dim", mode="append")
