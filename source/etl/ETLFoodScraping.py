@@ -70,65 +70,39 @@ class ETLFoodScraping:
 
         logging.getLogger(__name__).info("Start update_producto_dim")
 
-        # Ventana para obtener la ultima version de cada producto
-        window_spec = Window\
-            .partitionBy("product_id")\
-            .orderBy(psf.col("date").desc())
+        # Carlos los registros en base de datos
+        db = self.sparkDB.spark.table("producto_dim").alias("db")
 
-        # Nos quedamos con la ultima version de cada producto en el dataset,
-        # ya que se repiten en todas las fechas
-        product_dim_new = dataset\
-            .withColumn("row_number", psf.row_number().over(window_spec)) \
-            .where("row_number = 1") \
-            .withColumn("categoria", split_categoria(dataset.categories)) \
-            .select(["product_id",
-                     "product",
-                     "units",
-                     "brand",
-                     "categories",
-                     "categoria",
-                     "date"])
+        # Seleccion los del dataset que no están en base de datos
+        nuevos = dataset.alias("dt").join(db, "product_id", "left").where("db.id_producto is null").select("dt.*")
 
-        # Obtenemos os productos de base de datos
-        product_dim_db = DeltaTable.forName(self.sparkDB.spark, "producto_dim")\
-            .select(["product_id",
-                     "product",
-                     "units",
-                     "brand",
-                     "categories",
-                     "categoria",
-                     "date"])
+        # Inserto el id a los nuevos y el timestamp
+        nuevos = self.sparkDB.insert_id(nuevos, "producto_dim", "id_producto")\
+            .withColumn("ts_load", psf.current_timestamp()) \
 
-        # Obtenemos los productos con diferencias, comparando base de datos con dataset
-        # p_merge = product_dim_new.exceptAll(product_dim_db)
+        # Obtengo los del dataset que si que están en base de datos
+        estan = dataset.join(db.select(["product_id", "id_producto"]), "product_id", "inner")
+
+        # Inserto los nuevos
+        nuevos.write.format("delta").saveAsTable("producto_dim", mode="append")
+
+        # Mergeo los que ya estaban
+        product_dim_db = DeltaTable.forName(self.sparkDB.spark, "producto_dim")
+
         product_dim_db.alias('p') \
-            .merge(product_dim_new.alias('n'), 'p.product_id = n.product_id')\
+            .merge(estan.alias('n'), 'p.product_id == n.product_id') \
             .whenMatchedUpdate(set={
                 "product": "n.product",
                 "units": "n.units",
                 "brand": "n.brand",
-                "gender": "n.gender",
                 "categories": "n.categories",
                 "categoria": "n.categoria",
                 "date": "n.date",
                 "ts_load": psf.current_timestamp()
                 }
-            ) \
-            .whenNotMatchedInsert(values={
-                "id_producto": self.sparkDB.get_next_seq("producto_dim"),
-                "product": "n.product",
-                "units": "n.units",
-                "brand": "n.brand",
-                "gender": "n.gender",
-                "categories": "n.categories",
-                "categoria": "n.categoria",
-                "date": "n.date",
-                "ts_load": psf.current_timestamp()
-                }
-            ) \
-            .execute()
+            ).execute()
 
-        logging.getLogger(__name__).info("Productos actualizados: " + str(product_dim_new.count()))
+        logging.getLogger(__name__).info("Fin update_producto_dim")
 
     def update_producto_dia_fact(self,  dataset: pyspark.sql.DataFrame, year: int):
 
@@ -229,7 +203,7 @@ class ETLFoodScraping:
 
         # self.update_date_dim(dataset)
 
-        self.update_producto_dim(dataset)
+        self.update_producto_dim(dataset, year)
 
         # self.update_producto_dia_fact(dataset, year)
 
