@@ -89,24 +89,13 @@ class ETLFoodScraping:
                      "categoria",
                      "date"])
 
-        # Carlos los registros en base de datos
+        # Cargo los registros en base de datos
         db = self.sparkDB.spark.table("producto_dim").alias("db")
 
-        # Seleccion los del dataset que no están en base de datos
-        nuevos = dataset_ultimos.alias("dt")\
-            .join(db, "product_id", "left")\
-            .where("db.id_producto is null")\
-            .select("dt.*")
-
-        # Inserto el id a los nuevos y el timestamp
-        nuevos = self.sparkDB.insert_id(nuevos, "producto_dim", "id_producto")\
-            .withColumn("ts_load", psf.current_timestamp()) \
+        # Actualizar los que ya están #
 
         # Obtengo los del dataset que si que están en base de datos
         estan = dataset_ultimos.join(db.select(["product_id", "id_producto"]), "product_id", "inner")
-
-        # Inserto los nuevos
-        nuevos.write.format("delta").saveAsTable("producto_dim", mode="append")
 
         # Mergeo los que ya estaban
         product_dim_db = DeltaTable.forName(self.sparkDB.spark, "producto_dim")
@@ -123,6 +112,23 @@ class ETLFoodScraping:
                 "ts_load": psf.current_timestamp()
                 }
             ).execute()
+
+        # Insertar los que no existen
+
+        # Seleccion los del dataset que no están en base de datos
+        nuevos = dataset_ultimos.alias("dt") \
+            .join(db, "product_id", "left") \
+            .where("db.id_producto is null") \
+            .select("dt.*")
+
+        if nuevos.count() != 0:
+
+            # Inserto el id a los nuevos y el timestamp
+            nuevos = self.sparkDB.insert_id(nuevos, "producto_dim", "id_producto") \
+                .withColumn("ts_load", psf.current_timestamp())
+
+            # Inserto los nuevos
+            nuevos.write.format("delta").saveAsTable("producto_dim", mode="append")
 
         logging.getLogger(__name__).info("Fin update_producto_dim")
 
