@@ -66,7 +66,7 @@ class ETLFoodScraping:
         # Actializamos la base de datos.
         self.sparkDB.write_table(data_dim_merge, "date_dim", "append", "id_date")
 
-    def update_producto_dim(self, dataset: pyspark.sql.DataFrame, year: int):
+    def update_producto_dim(self, dataset: pyspark.sql.DataFrame):
 
         logging.getLogger(__name__).info("Start update_producto_dim")
 
@@ -122,6 +122,7 @@ class ETLFoodScraping:
             .select("dt.*")
 
         if nuevos.count() != 0:
+            logging.getLogger(__name__).info("Insertando productos: "+str(nuevos.count()))
 
             # Inserto el id a los nuevos y el timestamp
             nuevos = self.sparkDB.insert_id(nuevos, "producto_dim", "id_producto") \
@@ -136,21 +137,13 @@ class ETLFoodScraping:
 
         logging.getLogger(__name__).info("Start update_producto_dia_fact")
 
-        # Ventana para obtener la ultima version de cada producto
-        window_spec = Window \
-            .partitionBy(["product_id"]) \
-            .orderBy(psf.col("date").desc())
-
-        product_dim_db = self.sparkDB.read_table("producto_dim") \
-            .withColumn("row_number", psf.row_number().over(window_spec)) \
-            .where("row_number = 1") \
-            .select(["product_id",
-                     "id_producto"])\
+        # tabkla de productos para hacer el lookup
+        product_dim_db = self.sparkDB.read_table("producto_dim").select(["product_id", "id_producto"])
 
         # tabla de fechas para hacer el lookup
         date_dim_db = self.sparkDB.read_table("date_dim").select(["date", "id_date", "year"])
 
-        # obtengo los hechos del fichero
+        # obtengo los hechos del fichero del año concreto
         producto_dia_fact_new = dataset\
             .join(product_dim_db.alias("p"), "product_id", "left")\
             .join(date_dim_db.alias("d"), "date", "left")\
@@ -159,7 +152,8 @@ class ETLFoodScraping:
                      "discount",
                      "id_producto",
                      "id_date",
-                     "d.year"])
+                     "d.year"])\
+            .where(f"year = {year}")
 
         # Obtengo los hechos de base de datos
         producto_dia_fact_db = self.sparkDB.read_table("producto_dia_fact")\
@@ -229,13 +223,13 @@ class ETLFoodScraping:
 
         year = datetime.date.today().year
 
-        # self.update_date_dim(dataset)
+        self.update_date_dim(dataset)
 
-        self.update_producto_dim(dataset, year)
+        self.update_producto_dim(dataset)
 
-        # self.update_producto_dia_fact(dataset, year)
+        self.update_producto_dia_fact(dataset, year)
 
-        # self.update_precio_dia_norm_fact()
+        self.update_precio_dia_norm_fact()
 
     def export_dwh(self):
 
@@ -269,6 +263,6 @@ class ETLFoodScraping:
 
         self.load_dwh(dataset)
 
-        self.export_dwh()
+        # self.export_dwh()
 
         logging.getLogger(__name__).info("Finaliza ETL FoodScraping: SUCCESS")
