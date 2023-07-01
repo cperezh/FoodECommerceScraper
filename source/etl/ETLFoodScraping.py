@@ -164,6 +164,8 @@ class ETLFoodScraping:
                      "id_date",
                      "year"])
 
+
+
         # Obtenemos los hechos nuevos, comparando base de datos con dataset
         producto_dia_fact_merge = producto_dia_fact_new.exceptAll(producto_dia_fact_db)
 
