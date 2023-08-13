@@ -21,7 +21,7 @@ class DiaScraper:
 
     URLSiteMap = '/sitemap.xml'
     URLSite = 'https://www.dia.es'
-    URLCompreOnline = 'https://www.dia.es/compra-online/'
+    URLCompreOnline = 'https://www.dia.es'
 
     PRODUCTS_CSV_FILE = "products_list.csv"
     LOG_FILE = os.path.join('..', 'logs', 'logs.log')
@@ -67,7 +67,7 @@ class DiaScraper:
         t0 = time.time()
         page = session.get(url, headers=self.HEADERS)
         delay = time.time() - t0
-        time.sleep(2 * delay)
+        time.sleep(0.2 * delay)
         soup = BeautifulSoup(page.content, features='html.parser')
 
         return soup
@@ -82,9 +82,9 @@ class DiaScraper:
 
     @staticmethod
     def __obtain_name(page: bs4.BeautifulSoup) -> Tuple[str, str]:
-        fetched_product = page.find_all("div", "product-name container-center")
+        fetched_product = page.find_all("h1", class_="product-title")
         try:
-            product_name = [preprocess_str(product.text) for product in fetched_product][0]
+            product_name = [process_name(product.text) for product in fetched_product][0]
             brand = [process_brand(product.text) for product in fetched_product][0]
         except (IndexError, AttributeError):
             logging.warning('Product name not found')
@@ -95,7 +95,7 @@ class DiaScraper:
     @staticmethod
     def __obtain_price(page: bs4.BeautifulSoup) -> float:
         try:
-            fetched_price = page.find_all("span", "big-price")
+            fetched_price = page.find_all("p", class_= "buy-box__active-price")
             price = float([process_price(price.text) for price in fetched_price][0])
         except (IndexError, AttributeError):
             logging.warning('Product price not found')
@@ -104,7 +104,7 @@ class DiaScraper:
 
     @staticmethod
     def __obtain_categories(page: bs4.BeautifulSoup) -> List[str]:
-        fetched_categories = page.find_all("span", itemprop="name")
+        fetched_categories = page.find_all("span", class_="breadcrumb-item__link")
         try:
             categories = [preprocess_str(category.text) for category in fetched_categories]
         except AttributeError:
@@ -113,7 +113,7 @@ class DiaScraper:
 
     @staticmethod
     def __obtain_price_per_unit(page: bs4.BeautifulSoup) -> Tuple[float, str]:
-        fetched_unit_prices = page.find_all("span", "average-price")
+        fetched_unit_prices = page.find_all("p", "buy-box__price-per-unit")
         try:
             price = float([process_price(unit_price.text) for unit_price in fetched_unit_prices][0])
             units = [process_unit_price(unit_price.text) for unit_price in fetched_unit_prices][0]
@@ -156,7 +156,7 @@ class DiaScraper:
 
         if reload:
             logging.info("Recargando URLs de productos...")
-            self.__cargar_paginas_producto_autonomo()
+            self.__cargar_paginas_producto()
 
         self.__read_products_from_csv()
 
