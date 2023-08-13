@@ -34,5 +34,15 @@ def process_discount(text: str) -> str:
 
 def process_brand(text: str) -> str:
     text = preprocess_str(text)
-    match = re.search('\\b[A-ZÑÀ-Ö ]+\\b', text).group().strip()
-    return match.replace(",", ".")
+    match = re.findall('[A-Z]\\w+', text)
+
+    return match[1]
+
+
+def process_name(text: str) -> str:
+    text = preprocess_str(text)
+    match = re.findall('[A-Z][a-z áéíóú]+', text)
+
+    return match[0]
+
+
