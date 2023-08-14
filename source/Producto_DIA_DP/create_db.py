@@ -5,8 +5,14 @@ import datetime as dt
 
 def create_db(spark):
 
+    producto_dia_db = """
+                CREATE SCHEMA producto_dia
+            """
+
+    spark.sql(producto_dia_db)
+
     sequences_cfg = """
-            CREATE OR REPLACE TABLE sequences_cfg
+            CREATE OR REPLACE TABLE producto_dia.sequences_cfg
             (
                 table_name STRING,
                 id BIGINT,
@@ -17,7 +23,7 @@ def create_db(spark):
     spark.sql(sequences_cfg)
 
     product_dim = """
-            CREATE OR REPLACE TABLE producto_dim
+            CREATE OR REPLACE TABLE producto_dia.producto_dim
             (
                 id_producto int,
                 product string,
@@ -34,10 +40,20 @@ def create_db(spark):
     spark.sql(product_dim)
 
     conf = f"""
-            INSERT INTO sequences_cfg VALUES('producto_dim',0,'{dt.datetime.now()}')
+            INSERT INTO producto_dia.sequences_cfg VALUES('producto_dim',0,'{dt.datetime.now()}')
         """
 
     spark.sql(conf)
+
+    product_dim = """
+                CREATE OR REPLACE TABLE producto_dia.staging_product
+                (
+                    id_producto int,
+                    url_product string
+                ) USING DELTA;
+                """
+
+    spark.sql(product_dim)
 
 
 if __name__ == "__main__":

@@ -11,6 +11,7 @@ import SparkDBUtils
 import os
 import logging
 import datetime
+from pyspark.sql.types import StructType, StructField, IntegerType, StringType
 
 
 class DiaScraper:
@@ -22,7 +23,6 @@ class DiaScraper:
     URLSite = 'https://www.dia.es'
     URLCompreOnline = 'https://www.dia.es'
 
-    PRODUCTS_CSV_FILE = "products_list.csv"
     LOG_FILE = os.path.join('.', 'logs', 'logs.log')
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s",
@@ -33,10 +33,12 @@ class DiaScraper:
 
     sparkDB = SparkDBUtils.SparkDB()
 
-    def __init__(self):
+    staging_product_schema = StructType([
+        StructField("id_producto", IntegerType(), True),
+        StructField("url_product", StringType(), True)
+    ])
 
-        # Lista de paginas de producto del site
-        self.listaPaginasProducto = []
+    def __init__(self):
         self.data_path = utils.create_data_folder()
         self.execution_datetime = datetime.datetime.now()
 
@@ -47,17 +49,24 @@ class DiaScraper:
         :return:
         """
 
-        sitemap = utils.__get_xml_page(self.URLSite + self.URLSiteMap)
+        sitemap = utils.get_xml_page(self.URLSite + self.URLSiteMap)
 
         paginas_producto = sitemap.find_all("loc", string=re.compile('.+/p/\\d+'))
 
         pattern = re.compile("\\d+")
 
+        lista_paginas_producto = []
+
         for p in paginas_producto:
 
-            id_product = pattern.search(p.string).group()
+            id_product = int(pattern.search(p.string).group())
 
-            self.listaPaginasProducto.append(p.string)
+            lista_paginas_producto.append((id_product, p.string))
+
+        df = self.sparkDB.spark.createDataFrame(data=lista_paginas_producto,
+                                                schema=DiaScraper.staging_product_schema)
+
+        self.sparkDB.write_table(df, "producto_dia.staging_product", "overwrite", None)
 
     def __cargar_paginas_producto_autonomo_con_opcion(self, reload: bool):
         """
@@ -142,7 +151,7 @@ class DiaScraper:
         if reload:
             self.__cargar_paginas_producto()
 
-        # TODO: Leer paginas de producto
+        # TODO: Leer paginas de producto de la tabla de staging
 
         logging.info("Number of products to scan: " + str(len(self.listaPaginasProducto)))
 
@@ -152,9 +161,10 @@ class DiaScraper:
             record = utils.get_info_from_url(product_url)
             logging.info(f"Scanned: {product_number + 1} - product_id: {record.product_id}")
             try:
+                # TODO: Este metodo debe escribir en la tabla final
                 self.__save_record(record, record.product)
 
-                # TODO: Borrar el producto de la tabla
+                # TODO: Borrar el producto de la tabla de staging
 
             except AttributeError:
                 logging.warning(f"{product_url} failed. No information retrieved.")
