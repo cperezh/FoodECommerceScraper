@@ -1,17 +1,13 @@
-import bs4
-import requests
-from bs4 import BeautifulSoup
-import logging
 from utils import *
-from typing import Tuple, List
 import hashlib
 import glob
 import shutil
-import time
 import sys
 import pandas as pd
 import json
 from Producto import Producto
+import re as re
+import SparkDBUtils
 
 
 class DiaScraper:
@@ -24,7 +20,7 @@ class DiaScraper:
     URLCompreOnline = 'https://www.dia.es'
 
     PRODUCTS_CSV_FILE = "products_list.csv"
-    LOG_FILE = os.path.join('..', 'logs', 'logs.log')
+    LOG_FILE = os.path.join('.', 'logs', 'logs.log')
 
     HEADERS = {
         "User-Agent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
@@ -37,6 +33,8 @@ class DiaScraper:
                             logging.StreamHandler(sys.stdout)
                         ])
 
+    sparkDB = SparkDBUtils.SparkDB()
+
     def __init__(self):
 
         # Lista de paginas de producto del site
@@ -44,93 +42,11 @@ class DiaScraper:
         self.data_path = create_data_folder()
         self.execution_datetime = datetime.datetime.now()
 
-    def __get_xml_page(self, url: str) -> bs4.BeautifulSoup:
-        """
-        :param url:
-        :return: Devuelve un objeto BeautifulSoup para operar con la pagina cargada
-        """
 
-        session = requests.Session()
-        page = session.get(url, headers=self.HEADERS)
-        soup = BeautifulSoup(page.content, features='xml')
 
-        return soup
 
-    def __get_html_page(self, url: str) -> bs4.BeautifulSoup:
-        """
-        :param url:
-        :return: Devuelve un objeto BeautifulSoup para operar con la pagina cargada
-        """
 
-        session = requests.Session()
-        # Se simula navegacion humana, con retraso de 10x el tiempo del request.
-        t0 = time.time()
-        page = session.get(url, headers=self.HEADERS)
-        delay = time.time() - t0
-        time.sleep(0.2 * delay)
-        soup = BeautifulSoup(page.content, features='html.parser')
 
-        return soup
-
-    @staticmethod
-    def __print_page(page: bs4.BeautifulSoup, ruta: str):
-        """
-        imprime la pagina escrapeada en la ruta correspondiente.
-        """
-        with open(ruta, "w", encoding="utf-8") as f:
-            f.write(page.prettify())
-
-    @staticmethod
-    def __obtain_name(page: bs4.BeautifulSoup) -> Tuple[str, str]:
-        fetched_product = page.find_all("h1", class_="product-title")
-        try:
-            product_name = [process_name(product.text) for product in fetched_product][0]
-            brand = [process_brand(product.text) for product in fetched_product][0]
-        except (IndexError, AttributeError):
-            logging.warning('Product name not found')
-            product_name = None
-            brand = None
-        return product_name, brand
-
-    @staticmethod
-    def __obtain_price(page: bs4.BeautifulSoup) -> float:
-        try:
-            fetched_price = page.find_all("p", class_= "buy-box__active-price")
-            price = float([process_price(price.text) for price in fetched_price][0])
-        except (IndexError, AttributeError):
-            logging.warning('Product price not found')
-            price = None
-        return price
-
-    @staticmethod
-    def __obtain_categories(page: bs4.BeautifulSoup) -> List[str]:
-        fetched_categories = page.find_all("span", class_="breadcrumb-item__link")
-        try:
-            categories = [preprocess_str(category.text) for category in fetched_categories]
-        except AttributeError:
-            categories = None
-        return categories
-
-    @staticmethod
-    def __obtain_price_per_unit(page: bs4.BeautifulSoup) -> Tuple[float, str]:
-        fetched_unit_prices = page.find_all("p", "buy-box__price-per-unit")
-        try:
-            price = float([process_price(unit_price.text) for unit_price in fetched_unit_prices][0])
-            units = [process_unit_price(unit_price.text) for unit_price in fetched_unit_prices][0]
-        except (IndexError, AttributeError):
-            logging.warning('Unit price not found')
-            price = None
-            units = None
-        return price, units
-
-    @staticmethod
-    def __obtain_discount(page: bs4.BeautifulSoup) -> str:
-        try:
-            fetched_discount = page.find_all("span", "product_details_promotion_description")
-            discount_percentage = [process_discount(discount.text) for discount in fetched_discount][0]
-        except (IndexError, AttributeError):
-            discount_percentage = None
-        return discount_percentage
 
     def __cargar_paginas_producto(self):
         """
@@ -141,9 +57,14 @@ class DiaScraper:
 
         sitemap = self.__get_xml_page(self.URLSite + self.URLSiteMap)
 
-        paginas_producto = sitemap.find_all("loc", string=re.compile('.+/p/\d+'))
+        paginas_producto = sitemap.find_all("loc", string=re.compile('.+/p/\\d+'))
+
+        pattern = re.compile("\\d+")
 
         for p in paginas_producto:
+
+            id_product = pattern.search(p.string).group()
+
             self.listaPaginasProducto.append(p.string)
 
     def __cargar_paginas_producto_autonomo_con_opcion(self, reload: bool):
@@ -337,7 +258,8 @@ class DiaScraper:
         :return:
         """
 
-        self.__cargar_paginas_producto_autonomo_con_opcion(reload)
+        if reload:
+            self.__cargar_paginas_producto_autonomo_con_opcion(reload)
 
         logging.info("Number of products to scan: " + str(len(self.listaPaginasProducto)))
 

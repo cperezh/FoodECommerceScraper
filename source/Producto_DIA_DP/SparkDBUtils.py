@@ -41,14 +41,14 @@ class SparkDB:
 
             # si la tabla tiene "id", lo actualizo
             if id_column is not None:
-                df = self.insert_id(df, table_name, id_column)
+                df = self.__insert_id(df, table_name, id_column)
 
             # Saving data
             df.write \
                 .format("delta") \
                 .saveAsTable(table_name, mode=mode)
 
-    def read_last_seq(self, table_name: str) -> int:
+    def __read_last_seq(self, table_name: str) -> int:
 
         seq = self.spark.table("sequences_cfg")
 
@@ -58,7 +58,7 @@ class SparkDB:
 
         return int(last_seq)
 
-    def update_last_seq(self, df: pyspark.sql.dataframe, table_name: str, id_column: str):
+    def __update_last_seq(self, df: pyspark.sql.dataframe, table_name: str, id_column: str):
 
         # Obtenemos la nueva ultima secuencia
         last_seq = df.pandas_api()[id_column].max()
@@ -69,7 +69,7 @@ class SparkDB:
                     where table_name == '{table_name}'
                     """)
 
-    def insert_id(self, df: pyspark.sql.dataframe, table_name: str, id_column: str) -> pyspark.sql.dataframe:
+    def __insert_id(self, df: pyspark.sql.dataframe, table_name: str, id_column: str) -> pyspark.sql.dataframe:
         """
          Inserta en df una columna 'id' con enteros consecutivos, desde la
          ultima secuencia que se entregó para la table_name.
@@ -80,19 +80,19 @@ class SparkDB:
             .orderBy(df.columns[0])
 
         # Obtenemos la ultima secuencia que se utilizó
-        seq = self.read_last_seq(table_name)
+        seq = self.__read_last_seq(table_name)
 
         # Actualizamos la columna id con secuenciales desde la ultima secuencia
         df = df. \
             withColumn(id_column, f.row_number().over(window_spec) + seq)
 
-        self.update_last_seq(df, table_name, id_column)
+        self.__update_last_seq(df, table_name, id_column)
 
         return df
 
-    def get_next_seq(self,  table_name: str):
+    def __get_next_seq(self, table_name: str):
 
-        last_seq = self.read_last_seq()
+        last_seq = self.__read_last_seq()
 
         # Actualizamos en la tabla de secuencias
         self.spark.sql(f"""
