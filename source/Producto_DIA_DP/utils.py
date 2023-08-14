@@ -5,7 +5,7 @@ import os
 
 def create_data_folder():
     today = str(datetime.date.today()).replace('-', '')
-    data_path = os.path.join(os.getcwd(), '..', 'dataset', today)
+    data_path = os.path.join(os.getcwd(), '../..', 'dataset', today)
     os.makedirs(os.path.join(data_path, 'tmp'), exist_ok=True)
     return data_path
 

@@ -229,13 +229,13 @@ class ETLFoodScraping:
 
         year = datetime.date.today().year
 
-        # self.update_date_dim(dataset)
+        self.update_date_dim(dataset)
 
         self.update_producto_dim(dataset, year)
 
-        # self.update_producto_dia_fact(dataset, year)
+        self.update_producto_dia_fact(dataset, year)
 
-        # self.update_precio_dia_norm_fact()
+        self.update_precio_dia_norm_fact()
 
     def export_dwh(self):
 
