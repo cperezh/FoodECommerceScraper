@@ -1,4 +1,4 @@
-from utils import *
+import utils
 import hashlib
 import glob
 import shutil
@@ -8,6 +8,9 @@ import json
 from Producto import Producto
 import re as re
 import SparkDBUtils
+import os
+import logging
+import datetime
 
 
 class DiaScraper:
@@ -22,11 +25,6 @@ class DiaScraper:
     PRODUCTS_CSV_FILE = "products_list.csv"
     LOG_FILE = os.path.join('.', 'logs', 'logs.log')
 
-    HEADERS = {
-        "User-Agent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
-                      'Chrome/107.0.0.0 Safari/537.36 '
-    }
-
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s",
                         handlers=[
                             logging.FileHandler(LOG_FILE),
@@ -39,14 +37,8 @@ class DiaScraper:
 
         # Lista de paginas de producto del site
         self.listaPaginasProducto = []
-        self.data_path = create_data_folder()
+        self.data_path = utils.create_data_folder()
         self.execution_datetime = datetime.datetime.now()
-
-
-
-
-
-
 
     def __cargar_paginas_producto(self):
         """
@@ -55,7 +47,7 @@ class DiaScraper:
         :return:
         """
 
-        sitemap = self.__get_xml_page(self.URLSite + self.URLSiteMap)
+        sitemap = utils.__get_xml_page(self.URLSite + self.URLSiteMap)
 
         paginas_producto = sitemap.find_all("loc", string=re.compile('.+/p/\\d+'))
 
@@ -90,117 +82,6 @@ class DiaScraper:
         with open(self.PRODUCTS_CSV_FILE, "w") as f:
             for url in product_list:
                 f.write(url + "\n")
-
-    def __cargar_paginas_producto_autonomo(self):
-        """
-        Carga la lista de productos navegando por el menú de catalogo de productos
-        y por la paginación de cada categoría.
-        """
-
-        home = self.__get_html_page(self.URLCompreOnline)
-
-        # Busco todos los tags que hacen referencia a categorías de producto
-        categories_list_tags = home.find_all("a", class_="go-to-category")
-
-        lista_paginas_producto = []
-
-        # Recorro todas las categorias de productos
-        for categoria_tag in categories_list_tags:
-
-            url_catetoria = categoria_tag["href"]
-
-            pagina_categoria = self.__get_html_page(self.URLSite + url_catetoria)
-
-            # self.__print_page(pagina_categoria, pagina_categoria.title.string.strip()+".html")
-
-            # Obtengo las paginas de productos de la categoria
-            pagination = self.__obtain_pagination(pagina_categoria, url_catetoria)
-
-            # Para cada pagina de producto
-            for products_page in pagination:
-
-                pagina_categoria = self.__get_html_page(self.URLSite + products_page)
-
-                logging.info("Escaneando pagina: " + products_page)
-
-                # Busco todos los tags que hacen referencia a enlaces a Producto
-                product_main_link_tags = pagina_categoria.find_all("a", class_="productMainLink")
-
-                # Recorro todos los tags de enlace a Producto
-                for producto_tag in product_main_link_tags:
-                    url_producto = producto_tag["href"]
-
-                    lista_paginas_producto.append(self.URLSite + url_producto)
-
-        # Guardamos los productos en fichero para caché
-        self.__write_products_to_csv(lista_paginas_producto)
-
-    @staticmethod
-    def __obtain_pagination(category_page: bs4.BeautifulSoup, categoria_url: str) -> List[str]:
-        """
-        Devuelve todas las urls de las paginas de la categoria, segun la peginación que encuentre.
-        Busca la etiqueta "scan" que contiene el numero máximo de páginas y construye todas
-        las URLs para llamarlas.
-        :param category_page: pagina de la categoria
-        :param categoria_url: url de la pagina de la categoria
-        :return:
-        """
-
-        try:
-
-            paginator_bottom = category_page.find("div", class_="paginatorBottom")
-
-            # navegamos hasta la paginacion
-            pagination_list = paginator_bottom.find("div", class_="pagination-list-and-total")
-
-            # obtenemos el span con el texto "de X" siendo X el numero maximno de paginas, por ejemplo "de 21"
-            span = str(pagination_list.span.string)
-
-            # Sacamos el numero decimal del texto
-            numb = int(re.search('\d+', span).group())
-
-        # En caso de que la página no tenga la pie de pagina
-        except:
-            numb = 1
-
-        lista_paginas = []
-
-        # Construimos las paginas de navegacion
-        for n in range(numb):
-
-            # la primera pagina no tiene paginacion
-            if n == 0:
-                lista_paginas.append(categoria_url)
-            else:
-                url_paginacion = categoria_url + "?page=" + str(n)
-                lista_paginas.append(url_paginacion)
-
-        return lista_paginas
-
-    def __get_info_from_url(self, url: str) -> Producto:
-        """
-        param url: url address to scrap
-        return: dic with scrapped information.
-        """
-
-        page = self.__get_html_page(url)
-
-        producto = Producto()
-
-        producto.product_id = url.split('/')[-1]
-        producto.price = self.__obtain_price(page)
-        producto.product, producto.brand = self.__obtain_name(page)
-        producto.unit_price, producto.units = self.__obtain_price_per_unit(page)
-        producto.categories = self.__obtain_categories(page)
-        producto.discount = self.__obtain_discount(page)
-        producto.date = datetime.datetime.strftime(self.execution_datetime, '%Y-%m-%d')
-
-        # comprobamos si hay informacion missing.
-        if any([producto.price is None, producto.product is None, producto.brand is None,
-                producto.unit_price is None, producto.units is None]):
-            logging.warning(f"{url} failed. Missing information.")
-
-        return producto
 
     def __save_record(self, record: Producto, filename: str):
         """
@@ -259,18 +140,24 @@ class DiaScraper:
         """
 
         if reload:
-            self.__cargar_paginas_producto_autonomo_con_opcion(reload)
+            self.__cargar_paginas_producto()
+
+        # TODO: Leer paginas de producto
 
         logging.info("Number of products to scan: " + str(len(self.listaPaginasProducto)))
 
-        for product_number, product_url in enumerate(self.listaPaginasProducto):
+        for product_number, product_url in self.listaPaginasProducto:
 
             logging.info(f"Crawling {product_url}")
-            record = self.__get_info_from_url(product_url)
+            record = utils.get_info_from_url(product_url)
             logging.info(f"Scanned: {product_number + 1} - product_id: {record.product_id}")
             try:
                 self.__save_record(record, record.product)
+
+                # TODO: Borrar el producto de la tabla
+
             except AttributeError:
                 logging.warning(f"{product_url} failed. No information retrieved.")
+
         self.__save_results()
         return
