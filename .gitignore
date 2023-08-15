@@ -7,7 +7,7 @@ __pycache__
 *\tmp
 
 # Logs
-logs
+source/Producto_DIA_DP/logs
 
 # Virtual env
 venv
