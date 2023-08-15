@@ -13,6 +13,8 @@ HEADERS = {
                       'Chrome/107.0.0.0 Safari/537.36 '
     }
 
+execution_datetime = datetime.datetime.now()
+
 
 def get_xml_page(url: str) -> BeautifulSoup:
     """
@@ -44,7 +46,7 @@ def get_html_page(url: str) -> BeautifulSoup:
     return soup
 
 
-def get_info_from_url(self, url: str) -> Producto:
+def get_info_from_url(url: str) -> Producto:
     """
     param url: url address to scrap
     return: dic with scrapped information.
@@ -60,7 +62,7 @@ def get_info_from_url(self, url: str) -> Producto:
     producto.unit_price, producto.units = __obtain_price_per_unit(page)
     producto.categories = __obtain_categories(page)
     producto.discount = __obtain_discount(page)
-    producto.date = datetime.datetime.strftime(self.execution_datetime, '%Y-%m-%d')
+    producto.date = datetime.datetime.strftime(execution_datetime, '%Y-%m-%d')
 
     # comprobamos si hay informacion missing.
     if any([producto.price is None, producto.product is None, producto.brand is None,

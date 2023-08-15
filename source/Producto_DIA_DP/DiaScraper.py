@@ -11,7 +11,7 @@ import SparkDBUtils
 import os
 import logging
 import datetime
-from pyspark.sql.types import StructType, StructField, IntegerType, StringType
+from pyspark.sql.types import StructType, StructField, StringType
 
 
 class DiaScraper:
@@ -34,7 +34,7 @@ class DiaScraper:
     sparkDB = SparkDBUtils.SparkDB()
 
     staging_product_schema = StructType([
-        StructField("id_producto", IntegerType(), True),
+        StructField("id_producto", StringType(), True),
         StructField("url_product", StringType(), True)
     ])
 
@@ -53,44 +53,23 @@ class DiaScraper:
 
         paginas_producto = sitemap.find_all("loc", string=re.compile('.+/p/\\d+'))
 
-        pattern = re.compile("\\d+")
+        pattern = re.compile("\\d.*")
 
         lista_paginas_producto = []
 
         for p in paginas_producto:
 
-            id_product = int(pattern.search(p.string).group())
+            id_product = str(pattern.search(p.string).group())
 
-            lista_paginas_producto.append((id_product, p.string))
+            url = str(p.string)
+
+            lista_paginas_producto.append((id_product, url))
 
         df = self.sparkDB.spark.createDataFrame(data=lista_paginas_producto,
                                                 schema=DiaScraper.staging_product_schema)
 
         self.sparkDB.write_table(df, "producto_dia.staging_product", "overwrite", None)
 
-    def __cargar_paginas_producto_autonomo_con_opcion(self, reload: bool):
-        """
-        Carga las paginas de producto con navegacion autonomo.
-
-        :param reload: True si geremos volver a lanzar el escaneo online.
-            False si queremos cargar los productos del fichero csv cacheado (PRODUCTS_CSV_FILE))
-        """
-
-        if reload:
-            logging.info("Recargando URLs de productos...")
-            self.__cargar_paginas_producto()
-
-        self.__read_products_from_csv()
-
-    def __read_products_from_csv(self):
-        with open(self.PRODUCTS_CSV_FILE, "r") as f:
-            for url in f:
-                self.listaPaginasProducto.append(url.strip())
-
-    def __write_products_to_csv(self, product_list: list):
-        with open(self.PRODUCTS_CSV_FILE, "w") as f:
-            for url in product_list:
-                f.write(url + "\n")
 
     def __save_record(self, record: Producto, filename: str):
         """
@@ -152,14 +131,17 @@ class DiaScraper:
             self.__cargar_paginas_producto()
 
         # TODO: Leer paginas de producto de la tabla de staging
+        df_staging_product = self.sparkDB.spark.table("producto_dia.staging_product").pandas_api()
 
-        logging.info("Number of products to scan: " + str(len(self.listaPaginasProducto)))
+        logging.info("Number of products to scan: " + str(len(df_staging_product)))
 
-        for product_number, product_url in self.listaPaginasProducto:
+        for index, producto in df_staging_product.iterrows():
+            product_number = producto['id_producto']
+            product_url = producto['url_product']
 
             logging.info(f"Crawling {product_url}")
             record = utils.get_info_from_url(product_url)
-            logging.info(f"Scanned: {product_number + 1} - product_id: {record.product_id}")
+            logging.info(f"Scanned: product_id: {record.product_id}")
             try:
                 # TODO: Este metodo debe escribir en la tabla final
                 self.__save_record(record, record.product)
