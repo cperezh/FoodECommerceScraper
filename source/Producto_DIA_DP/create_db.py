@@ -5,9 +5,7 @@ import datetime as dt
 
 def create_db(spark):
 
-    spark.sql("DROP SCHEMA IF EXISTS producto_dia CASCADE")
-
-    spark.sql("CREATE SCHEMA producto_dia")
+    spark.sql("CREATE SCHEMA IF NOT EXISTS producto_dia")
 
     sequences_cfg = """
             CREATE OR REPLACE TABLE producto_dia.sequences_cfg
@@ -47,7 +45,8 @@ def create_db(spark):
                 CREATE OR REPLACE TABLE producto_dia.staging_product
                 (
                     id_producto string,
-                    url_product string
+                    url_product string,
+                    fecha_datos timestamp
                 ) USING DELTA;
                 """
 

@@ -11,7 +11,9 @@ import SparkDBUtils
 import os
 import logging
 import datetime
-from pyspark.sql.types import StructType, StructField, StringType
+from pyspark.sql.types import StructType, StructField, StringType, TimestampType
+import delta
+import pyspark.sql.functions as F
 
 
 class DiaScraper:
@@ -35,7 +37,8 @@ class DiaScraper:
 
     staging_product_schema = StructType([
         StructField("id_producto", StringType(), True),
-        StructField("url_product", StringType(), True)
+        StructField("url_product", StringType(), True),
+        StructField("fecha_datos", TimestampType(), True),
     ])
 
     def __init__(self):
@@ -63,13 +66,12 @@ class DiaScraper:
 
             url = str(p.string)
 
-            lista_paginas_producto.append((id_product, url))
+            lista_paginas_producto.append((id_product, url, self.execution_datetime))
 
         df = self.sparkDB.spark.createDataFrame(data=lista_paginas_producto,
                                                 schema=DiaScraper.staging_product_schema)
 
         self.sparkDB.write_table(df, "producto_dia.staging_product", "overwrite", None)
-
 
     def __save_record(self, record: Producto, filename: str):
         """
@@ -130,7 +132,7 @@ class DiaScraper:
         if reload:
             self.__cargar_paginas_producto()
 
-        # TODO: Leer paginas de producto de la tabla de staging
+        # Leer paginas de producto de la tabla de staging
         df_staging_product = self.sparkDB.spark.table("producto_dia.staging_product").pandas_api()
 
         logging.info("Number of products to scan: " + str(len(df_staging_product)))
@@ -146,10 +148,12 @@ class DiaScraper:
                 # TODO: Este metodo debe escribir en la tabla final
                 self.__save_record(record, record.product)
 
-                # TODO: Borrar el producto de la tabla de staging
-
             except AttributeError:
                 logging.warning(f"{product_url} failed. No information retrieved.")
+
+            # Borramos el producto procesado, de la tabla de staging
+            dt = delta.DeltaTable.forName(self.sparkDB.spark, "producto_dia.staging_product")
+            dt.delete(F.col("id_producto") == product_number)
 
         self.__save_results()
         return
