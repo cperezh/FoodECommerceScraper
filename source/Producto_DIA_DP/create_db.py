@@ -46,7 +46,7 @@ def create_db(spark):
                 (
                     id_producto string,
                     url_product string,
-                    fecha_datos timestamp
+                    index int
                 ) USING DELTA;
                 """
 
