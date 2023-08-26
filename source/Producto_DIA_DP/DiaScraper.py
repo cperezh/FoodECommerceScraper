@@ -134,22 +134,23 @@ class DiaScraper:
         if reload:
             self.__cargar_paginas_producto()
 
-        # Leer paginas de producto de la tabla de staging
-        df_staging_product = self.sparkDB.spark.table("producto_dia.staging_product").pandas_api()
+        # Leer paginas de producto de la tabla de staging, ordenadas por index
+        df_staging_product = self.sparkDB.spark\
+            .table("producto_dia.staging_product")\
+            .orderBy("index")\
+            .pandas_api()
 
         number_products_scan = len(df_staging_product)
+        elementos_tratados = 0
 
-        logging.info(f"Number of products to scan: {number_products_scan}")
-
-        df_staging_product.sort_values(by="index", inplace=True, ascending=True)
-
+        # Recorro todos los productos de la tabla de staging
         for i, producto in df_staging_product.iterrows():
 
             product_number = producto['id_producto']
             product_url = producto['url_product']
             index = producto["index"]
 
-            logging.info(f"Number of products left: {number_products_scan-index}")
+            logging.info(f"Number of products left: {number_products_scan - elementos_tratados}")
 
             logging.info(f"Crawling {product_url}")
             record = utils.get_info_from_url(product_url)
@@ -161,8 +162,11 @@ class DiaScraper:
             except AttributeError:
                 logging.warning(f"{product_url} failed. No information retrieved.")
 
-            # Borramos el producto procesado, de la tabla de staging
-            if index % 100 == 0:
+            # Actualización de punteros
+            elementos_tratados += 1
+
+            # Cada 100 elementos, purgamos la tabla de staging o cuando ya no queden elementos por tratar
+            if number_products_scan == elementos_tratados or elementos_tratados % 8 == 0:
                 dt = delta.DeltaTable.forName(self.sparkDB.spark, "producto_dia.staging_product")
                 dt.delete(F.col("index") <= index)
                 logging.warning(f"Borrando productos con indice menor que  {index} .")
