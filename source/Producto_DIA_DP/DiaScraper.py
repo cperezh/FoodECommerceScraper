@@ -166,7 +166,7 @@ class DiaScraper:
             elementos_tratados += 1
 
             # Cada 100 elementos, purgamos la tabla de staging o cuando ya no queden elementos por tratar
-            if number_products_scan == elementos_tratados or elementos_tratados % 8 == 0:
+            if number_products_scan == elementos_tratados or elementos_tratados % 100 == 0:
                 dt = delta.DeltaTable.forName(self.sparkDB.spark, "producto_dia.staging_product")
                 dt.delete(F.col("index") <= index)
                 logging.warning(f"Borrando productos con indice menor que  {index} .")
