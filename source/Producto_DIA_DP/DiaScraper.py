@@ -11,7 +11,9 @@ import SparkDBUtils
 import os
 import logging
 import datetime
-from pyspark.sql.types import StructType, StructField, StringType
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType
+import delta
+import pyspark.sql.functions as F
 
 
 class DiaScraper:
@@ -35,7 +37,8 @@ class DiaScraper:
 
     staging_product_schema = StructType([
         StructField("id_producto", StringType(), True),
-        StructField("url_product", StringType(), True)
+        StructField("url_product", StringType(), True),
+        StructField("index", IntegerType(), True)
     ])
 
     def __init__(self):
@@ -49,6 +52,8 @@ class DiaScraper:
         :return:
         """
 
+        # TODO Borrar todos los archivos temp
+
         sitemap = utils.get_xml_page(self.URLSite + self.URLSiteMap)
 
         paginas_producto = sitemap.find_all("loc", string=re.compile('.+/p/\\d+'))
@@ -57,19 +62,18 @@ class DiaScraper:
 
         lista_paginas_producto = []
 
-        for p in paginas_producto:
+        for index, p in enumerate(paginas_producto):
 
             id_product = str(pattern.search(p.string).group())
 
             url = str(p.string)
 
-            lista_paginas_producto.append((id_product, url))
+            lista_paginas_producto.append((id_product, url, index))
 
         df = self.sparkDB.spark.createDataFrame(data=lista_paginas_producto,
                                                 schema=DiaScraper.staging_product_schema)
 
         self.sparkDB.write_table(df, "producto_dia.staging_product", "overwrite", None)
-
 
     def __save_record(self, record: Producto, filename: str):
         """
@@ -130,26 +134,42 @@ class DiaScraper:
         if reload:
             self.__cargar_paginas_producto()
 
-        # TODO: Leer paginas de producto de la tabla de staging
-        df_staging_product = self.sparkDB.spark.table("producto_dia.staging_product").pandas_api()
+        # Leer paginas de producto de la tabla de staging, ordenadas por index
+        df_staging_product = self.sparkDB.spark\
+            .table("producto_dia.staging_product")\
+            .orderBy("index")\
+            .pandas_api()
 
-        logging.info("Number of products to scan: " + str(len(df_staging_product)))
+        number_products_scan = len(df_staging_product)
+        elementos_tratados = 0
 
-        for index, producto in df_staging_product.iterrows():
+        # Recorro todos los productos de la tabla de staging
+        for i, producto in df_staging_product.iterrows():
+
             product_number = producto['id_producto']
             product_url = producto['url_product']
+            index = producto["index"]
+
+            logging.info(f"Number of products left: {number_products_scan - elementos_tratados}")
 
             logging.info(f"Crawling {product_url}")
             record = utils.get_info_from_url(product_url)
-            logging.info(f"Scanned: product_id: {record.product_id}")
+            logging.info(f"Scanned: product_id: {product_number}")
             try:
                 # TODO: Este metodo debe escribir en la tabla final
                 self.__save_record(record, record.product)
 
-                # TODO: Borrar el producto de la tabla de staging
-
             except AttributeError:
                 logging.warning(f"{product_url} failed. No information retrieved.")
+
+            # Actualización de punteros
+            elementos_tratados += 1
+
+            # Cada 100 elementos, purgamos la tabla de staging o cuando ya no queden elementos por tratar
+            if number_products_scan == elementos_tratados or elementos_tratados % 100 == 0:
+                dt = delta.DeltaTable.forName(self.sparkDB.spark, "producto_dia.staging_product")
+                dt.delete(F.col("index") <= index)
+                logging.warning(f"Borrando productos con indice menor que  {index} .")
 
         self.__save_results()
         return
