@@ -51,7 +51,7 @@ class ETLFoodScraping:
         date_dim_new = dataset.select([dataset.date]).distinct()
 
         # Obtenemos las fechas en la base de datos
-        date_dim = self.sparkDB.read_table("date_dim").select("date").distinct()
+        date_dim = self.sparkDB.read_table("analisis_precios.date_dim").select("date").distinct()
 
         # Vemos cuál de las nuevas no está en la base de datos
         data_dim_merge = date_dim_new.exceptAll(date_dim)
@@ -64,7 +64,7 @@ class ETLFoodScraping:
         logging.getLogger(__name__).info("Fechas actualizadas: " + str(data_dim_merge.count()))
 
         # Actializamos la base de datos.
-        self.sparkDB.write_table(data_dim_merge, "date_dim", "append", "id_date")
+        self.sparkDB.write_table(data_dim_merge, "analisis_precios.date_dim", "append", "id_date")
 
     def update_producto_dim(self, dataset: pyspark.sql.DataFrame, year: int):
 
@@ -90,7 +90,7 @@ class ETLFoodScraping:
                      "date"])
 
         # Cargo los registros en base de datos
-        db = self.sparkDB.spark.table("producto_dim").alias("db")
+        db = self.sparkDB.spark.table("analisis_precios.producto_dim").alias("db")
 
         # Actualizar los que ya están #
 
@@ -98,7 +98,7 @@ class ETLFoodScraping:
         estan = dataset_ultimos.join(db.select(["product_id", "id_producto"]), "product_id", "inner")
 
         # Mergeo los que ya estaban
-        product_dim_db = DeltaTable.forName(self.sparkDB.spark, "producto_dim")
+        product_dim_db = DeltaTable.forName(self.sparkDB.spark, "analisis_precios.producto_dim")
 
         product_dim_db.alias('p') \
             .merge(estan.alias('n'), 'p.product_id == n.product_id') \
@@ -124,11 +124,11 @@ class ETLFoodScraping:
         if nuevos.count() != 0:
 
             # Inserto el id a los nuevos y el timestamp
-            nuevos = self.sparkDB.insert_id(nuevos, "producto_dim", "id_producto") \
+            nuevos = self.sparkDB.insert_id(nuevos, "analisis_precios.producto_dim", "id_producto") \
                 .withColumn("ts_load", psf.current_timestamp())
 
             # Inserto los nuevos
-            nuevos.write.format("delta").saveAsTable("producto_dim", mode="append")
+            nuevos.write.format("delta").saveAsTable("analisis_precios.producto_dim", mode="append")
 
         logging.getLogger(__name__).info("Fin update_producto_dim")
 
@@ -141,14 +141,14 @@ class ETLFoodScraping:
             .partitionBy(["product_id"]) \
             .orderBy(psf.col("date").desc())
 
-        product_dim_db = self.sparkDB.read_table("producto_dim") \
+        product_dim_db = self.sparkDB.read_table("analisis_precios.producto_dim") \
             .withColumn("row_number", psf.row_number().over(window_spec)) \
             .where("row_number = 1") \
             .select(["product_id",
                      "id_producto"])\
 
         # tabla de fechas para hacer el lookup
-        date_dim_db = self.sparkDB.read_table("date_dim").select(["date", "id_date", "year"])
+        date_dim_db = self.sparkDB.read_table("analisis_precios.date_dim").select(["date", "id_date", "year"])
 
         # obtengo los hechos del fichero
         producto_dia_fact_new = dataset\
@@ -162,7 +162,7 @@ class ETLFoodScraping:
                      "d.year"])
 
         # Obtengo los hechos de base de datos
-        producto_dia_fact_db = self.sparkDB.read_table("producto_dia_fact")\
+        producto_dia_fact_db = self.sparkDB.read_table("analisis_precios.producto_dia_fact")\
             .select(["price",
                      "unit_price",
                      "discount",
@@ -179,13 +179,13 @@ class ETLFoodScraping:
 
         logging.getLogger(__name__).info("Hechos actualizados: " + str(producto_dia_fact_merge.count()))
 
-        self.sparkDB.write_table(producto_dia_fact_merge, "producto_dia_fact", "append")
+        self.sparkDB.write_table(producto_dia_fact_merge, "analisis_precios.producto_dia_fact", "append")
 
     def update_precio_dia_norm_fact(self):
 
         logging.getLogger(__name__).info("Start update_precio_dia_norm_fact")
 
-        producto_dia_fact = self.sparkDB.read_table("producto_dia_fact")
+        producto_dia_fact = self.sparkDB.read_table("analisis_precios.producto_dia_fact")
 
         # Agrupo a nivel de DIA, para calcular el total de precios diarios
         price_dia_agg_fact = producto_dia_fact\
@@ -210,7 +210,7 @@ class ETLFoodScraping:
                         (psf.col("sum_unit_price_ponderado") - pdf_pandas["sum_unit_price_ponderado"].min()) /
                         (pdf_pandas["sum_unit_price_ponderado"].max() - pdf_pandas["sum_unit_price_ponderado"].min()))
 
-        self.sparkDB.write_table(precio_dia_agg_norm_fact, "precio_dia_agg_norm_fact", "overwrite")
+        self.sparkDB.write_table(precio_dia_agg_norm_fact, "analisis_precios.precio_dia_agg_norm_fact", "overwrite")
 
         logging.getLogger(__name__).info("precio_dia_agg_norm_fact creada")
 
@@ -241,22 +241,22 @@ class ETLFoodScraping:
 
         logging.getLogger(__name__).info("Start export_dwh")
 
-        self.sparkDB.spark.table("date_dim")\
+        self.sparkDB.spark.table("analisis_precios.date_dim")\
             .toPandas()\
             .to_csv("c:/tmp/extract/date_dim.csv",
                     index=False, sep=";", decimal=",")
 
-        self.sparkDB.spark.table("producto_dim") \
+        self.sparkDB.spark.table("analisis_precios.producto_dim") \
             .toPandas() \
             .to_csv("c:/tmp/extract/producto_dim.csv",
                     index=False, sep=";", decimal=",")
 
-        self.sparkDB.spark.table("producto_dia_fact") \
+        self.sparkDB.spark.table("analisis_precios.producto_dia_fact") \
             .toPandas() \
             .to_csv("c:/tmp/extract/producto_dia_fact.csv",
                     index=False, sep=";", decimal=",")
 
-        self.sparkDB.spark.table("precio_dia_agg_norm_fact") \
+        self.sparkDB.spark.table("analisis_precios.precio_dia_agg_norm_fact") \
             .toPandas() \
             .to_csv("c:/tmp/extract/precio_dia_agg_norm_fact.csv",
                     index=False, sep=";", decimal=",")

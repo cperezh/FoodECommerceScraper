@@ -50,7 +50,7 @@ class SparkDB:
 
     def read_last_seq(self, table_name: str) -> int:
 
-        seq = self.spark.table("sequences_cfg")
+        seq = self.spark.table("analisis_precios.sequences_cfg")
 
         seq = seq.where(f"table_name == '{table_name}'")
 
@@ -65,7 +65,7 @@ class SparkDB:
 
         # Actualizamos en la tabla de secuencias
         self.spark.sql(f"""
-                    update sequences_cfg set id={last_seq} 
+                    update analisis_precios.sequences_cfg set id={last_seq} 
                     where table_name == '{table_name}'
                     """)
 
