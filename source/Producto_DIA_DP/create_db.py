@@ -28,7 +28,7 @@ def create_db(spark):
                 units string,
                 price double
                 unit_price double
-                discount double
+                discount double,
                 date date,
                 ts_load timestamp
                 
