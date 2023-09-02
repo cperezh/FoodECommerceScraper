@@ -144,20 +144,26 @@ class DiaScraper:
         elementos_tratados = 0
 
         # Recorro todos los productos de la tabla de staging
-        for i, producto in df_staging_product.iterrows():
+        for i, stg_producto in df_staging_product.iterrows():
 
-            product_number = producto['id_producto']
-            product_url = producto['url_product']
-            index = producto["index"]
+            product_number = stg_producto['id_producto']
+            product_url = stg_producto['url_product']
+            index = stg_producto["index"]
 
             logging.info(f"Number of products left: {number_products_scan - elementos_tratados}")
 
             logging.info(f"Crawling {product_url}")
-            record = utils.get_info_from_url(product_url)
+
+            producto = utils.get_info_from_url(product_url)
+
             logging.info(f"Scanned: product_id: {product_number}")
             try:
                 # TODO: Este metodo debe escribir en la tabla final
-                self.__save_record(record, record.product)
+                self.__save_record(producto, producto.product)
+
+                pdf = producto.to_spark_df(self.sparkDB.spark)
+
+                self.sparkDB.write_table(pdf, "producto_dia.producto_dim", "append")
 
             except AttributeError:
                 logging.warning(f"{product_url} failed. No information retrieved.")

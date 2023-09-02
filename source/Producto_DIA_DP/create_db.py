@@ -21,15 +21,17 @@ def create_db(spark):
     product_dim = """
             CREATE OR REPLACE TABLE producto_dia.producto_dim
             (
-                id_producto int,
+                product_id string,
                 product string,
                 brand string,
                 categories string,
-                product_id string,
-                date date,
-                categoria string,
                 units string,
+                price double
+                unit_price double
+                discount double
+                date date,
                 ts_load timestamp
+                
             ) USING DELTA;
             """
 
