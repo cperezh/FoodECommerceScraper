@@ -13,7 +13,7 @@ class Producto:
         StructField("brand", StringType(), True),
         StructField("price", DoubleType(), True),
         StructField("categories", StringType(), True),
-        StructField("unit_price", FloatType(), True),
+        StructField("unit_price", DoubleType(), True),
         StructField("units", StringType(), True),
         StructField("discount", DoubleType(), True),
         StructField("date", DateType(), True),
