@@ -138,7 +138,7 @@ class DiaScraper:
         df_staging_product = self.sparkDB.spark\
             .table("producto_dia.staging_product")\
             .orderBy("index")\
-            .pandas_api()
+            .toPandas()
 
         number_products_scan = len(df_staging_product)
         elementos_tratados = 0
@@ -157,16 +157,16 @@ class DiaScraper:
             producto = utils.get_info_from_url(product_url)
 
             logging.info(f"Scanned: product_id: {product_number}")
+
             try:
-                # TODO: Este metodo debe escribir en la tabla final
-                self.__save_record(producto, producto.product)
+                # self.__save_record(producto, producto.product)
 
                 pdf = producto.to_spark_df(self.sparkDB.spark)
 
                 self.sparkDB.write_table(pdf, "producto_dia.producto_dim", "append")
 
-            except AttributeError:
-                logging.warning(f"{product_url} failed. No information retrieved.")
+            except Exception as e:
+                logging.warning(f"{product_url} failed. No information retrieved.{e}")
 
             # Actualización de punteros
             elementos_tratados += 1

@@ -56,13 +56,13 @@ def get_info_from_url(url: str) -> Producto:
 
     producto = Producto()
 
-    producto.product_id = url.split('/')[-1]
+    producto.product_id = str(url.split('/')[-1])
     producto.price = __obtain_price(page)
     producto.product, producto.brand = __obtain_name(page)
     producto.unit_price, producto.units = __obtain_price_per_unit(page)
     producto.categories = __obtain_categories(page)
     producto.discount = __obtain_discount(page)
-    producto.date = datetime.datetime.strftime(execution_datetime, '%Y-%m-%d')
+    producto.date = execution_datetime.date()
 
     # comprobamos si hay informacion missing.
     if any([producto.price is None, producto.product is None, producto.brand is None,

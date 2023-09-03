@@ -1,6 +1,6 @@
 
 from pyspark.sql.types import StructType, StructField, DateType, \
-    StringType, FloatType, TimestampType
+    StringType, FloatType, DoubleType, TimestampType
 
 import pyspark.sql
 
@@ -11,11 +11,11 @@ class Producto:
         StructField("product", StringType(), True),
         StructField("product_id", StringType(), True),
         StructField("brand", StringType(), True),
-        StructField("price", FloatType(), True),
+        StructField("price", DoubleType(), True),
         StructField("categories", StringType(), True),
         StructField("unit_price", FloatType(), True),
         StructField("units", StringType(), True),
-        StructField("discount", FloatType(), True),
+        StructField("discount", DoubleType(), True),
         StructField("date", DateType(), True),
         StructField("ts_load", TimestampType(), True)
     ])
@@ -38,11 +38,11 @@ class Producto:
 
     def to_spark_df(self, spark: pyspark.sql.SparkSession) -> pyspark.sql.DataFrame:
 
-        data = self.to_dict()
+        producto_dict = (self,)
 
-        df = spark.createDataFrame(data, schema=Producto.producto_dim_schema)
+        df = spark.createDataFrame(data=producto_dict, schema=Producto.producto_dim_schema)
 
-        return None
+        return df
 
 
 
