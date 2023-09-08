@@ -21,20 +21,33 @@ class Producto:
     ])
 
     def __init__(self):
-
-        self.product_id = ""
-        self.price = 0
         self.product = ""
+        self.product_id = ""
         self.brand = ""
+        self.price = 0
+        self.categories = ""
         self.unit_price = 0
         self.units = 0
-        self.categories = ""
         self.discount = 0
         self.date = None
         self.ts_load = None
 
     def to_dict(self) -> dict:
         return self.__dict__
+
+    def to_tuple(self) -> tuple:
+        t = (self.product,
+             self.product_id,
+             self.brand,
+             self.price,
+             self.categories,
+             self.unit_price,
+             self.units,
+             self.discount,
+             self.date,
+             self.ts_load)
+
+        return t
 
     def to_spark_df(self, spark: pyspark.sql.SparkSession) -> pyspark.sql.DataFrame:
 
@@ -44,5 +57,24 @@ class Producto:
 
         return df
 
+    @staticmethod
+    def list_to_spark_df(producto_list: list, spark: pyspark.sql.SparkSession) -> pyspark.sql.DataFrame:
+
+        lista_dict = [producto.to_tuple for producto in producto_list ]
+
+        df = spark.createDataFrame(data=lista_dict, schema=Producto.producto_dim_schema)
+
+        return df
+
+
+if __name__ == "__main__":
+    p1 = Producto()
+    p2 = Producto()
+
+    lista = [p1, p2]
+
+    a = [(tuple(lista))]
+
+    print(a)
 
 

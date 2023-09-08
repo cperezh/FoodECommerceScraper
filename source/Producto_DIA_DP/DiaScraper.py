@@ -1,3 +1,5 @@
+from itertools import product
+
 import utils
 import hashlib
 import glob
@@ -142,40 +144,46 @@ class DiaScraper:
 
         number_products_scan = len(df_staging_product)
         elementos_tratados = 0
+        lista_productos = []
 
         # Recorro todos los productos de la tabla de staging
         for i, stg_producto in df_staging_product.iterrows():
 
-            product_number = stg_producto['id_producto']
-            product_url = stg_producto['url_product']
-            index = stg_producto["index"]
-
             logging.info(f"Number of products left: {number_products_scan - elementos_tratados}")
 
-            logging.info(f"Crawling {product_url}")
+            logging.info(f"Crawling {stg_producto['url_product']}")
 
-            producto = utils.get_info_from_url(product_url)
+            producto = utils.get_info_from_url(stg_producto['url_product'])
 
-            logging.info(f"Scanned: product_id: {product_number}")
+            logging.info(f"Scanned: product_id: {stg_producto['id_producto']}")
 
             try:
                 # self.__save_record(producto, producto.product)
 
-                pdf = producto.to_spark_df(self.sparkDB.spark)
+                producto.ts_load = datetime.datetime.now()
 
-                self.sparkDB.write_table(pdf, "producto_dia.producto_dim", "append")
+                lista_productos.append(producto)
+
+                producto.to_spark_df(self.sparkDB.spark)
 
             except Exception as e:
-                logging.warning(f"{product_url} failed. No information retrieved.{e}")
+                logging.warning(f"{stg_producto['url_product']} failed. No information retrieved.{e}")
 
             # Actualización de punteros
             elementos_tratados += 1
 
             # Cada 100 elementos, purgamos la tabla de staging o cuando ya no queden elementos por tratar
-            if number_products_scan == elementos_tratados or elementos_tratados % 100 == 0:
+            if number_products_scan == elementos_tratados or elementos_tratados % 2 == 0:
+
+                pdf = Producto.list_to_spark_df(lista_productos, self.sparkDB.spark)
+
+                self.sparkDB.write_table(pdf, "producto_dia.producto_dim", "append")
+
                 dt = delta.DeltaTable.forName(self.sparkDB.spark, "producto_dia.staging_product")
-                dt.delete(F.col("index") <= index)
-                logging.warning(f"Borrando productos con indice menor que  {index} .")
+
+                dt.delete(F.col("index") <= stg_producto['index'])
+
+                logging.warning(f">>>>> Borrando productos con indice menor que  {stg_producto['index']} .")
 
         self.__save_results()
         return

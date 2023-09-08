@@ -173,3 +173,4 @@ def __print_page(page: BeautifulSoup, ruta: str):
     """
     with open(ruta, "w", encoding="utf-8") as f:
         f.write(page.prettify())
+
