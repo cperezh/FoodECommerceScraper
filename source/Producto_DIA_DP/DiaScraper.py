@@ -151,33 +151,30 @@ class DiaScraper:
 
             logging.info(f"Number of products left: {number_products_scan - elementos_tratados}")
 
-            logging.info(f"Crawling {stg_producto['url_product']}")
-
-            producto = utils.get_info_from_url(stg_producto['url_product'])
-
-            logging.info(f"Scanned: product_id: {stg_producto['id_producto']}")
+            logging.info(f" Scraping: product_id: {stg_producto['id_producto']} : {stg_producto['url_product']}")
 
             try:
-                # self.__save_record(producto, producto.product)
+                producto = utils.get_info_from_url(stg_producto['url_product'])
 
                 producto.ts_load = datetime.datetime.now()
 
                 lista_productos.append(producto)
 
-                producto.to_spark_df(self.sparkDB.spark)
-
             except Exception as e:
-                logging.warning(f"{stg_producto['url_product']} failed. No information retrieved.{e}")
+                logging.warning(f"!!!Failed. Exception: {e}")
 
             # Actualización de punteros
             elementos_tratados += 1
 
-            # Cada 100 elementos, purgamos la tabla de staging o cuando ya no queden elementos por tratar
-            if number_products_scan == elementos_tratados or elementos_tratados % 2 == 0:
+            # Cada 100 elementos o cuando ya no queden elementos por tratar:
+            # insertamos los elementos tratados y purgamos la tabla de staging
+            if number_products_scan == elementos_tratados or elementos_tratados % 100 == 0:
 
                 pdf = Producto.list_to_spark_df(lista_productos, self.sparkDB.spark)
 
                 self.sparkDB.write_table(pdf, "producto_dia.producto_dim", "append")
+
+                lista_productos = []
 
                 dt = delta.DeltaTable.forName(self.sparkDB.spark, "producto_dia.staging_product")
 
