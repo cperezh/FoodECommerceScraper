@@ -77,52 +77,6 @@ class DiaScraper:
 
         self.sparkDB.write_table(df, "producto_dia.staging_product", "overwrite", None)
 
-    def __save_record(self, record: Producto, filename: str):
-        """
-        saves scrapped information in temp folder.
-        """
-        with open(os.path.join(self.data_path, 'tmp', hashlib.md5(filename.encode()).hexdigest() + '.json'), 'w+',
-                  encoding='utf-8') as f:
-            json.dump(record.to_dict(), f, ensure_ascii=False)
-
-    def __save_results(self):
-        """
-        aggregates temp information in a single csv from the execution
-        """
-        json_output = {"data": []}
-        logging.info("Crawling finished. Processing tmp data.")
-        # para cada archivo que encontramos en la carpeta tmp lo guardamos en memoria.
-        for file in glob.glob(os.path.join(self.data_path, 'tmp', '*.json')):
-            with open(file, 'r+', encoding='utf-8') as f:
-                record = json.loads(f.read())
-                json_output["data"].append(record)
-
-        # guardamos la lista total en csv.
-        pd.DataFrame(json_output["data"]) \
-            .to_csv(os.path.join(self.data_path,
-                                 datetime.datetime.strftime(self.execution_datetime,
-                                                            '%Y%m%d_%H%M') + '_dia.csv'),
-                    sep=";", encoding="utf-8", index=False)
-        # eliminamos el directorio tmp
-        shutil.rmtree(os.path.join(self.data_path, 'tmp'))
-
-    def generate_dataset(self):
-        """
-        Appends or generates the dataset.csv file with the newly scrapped information.
-        """
-        try:
-            dataset = pd.read_csv(os.path.join(self.data_path, '..', 'dataset.csv'), sep=";", encoding="utf-8")
-        # si no existe o no contiene datos, generamos un nuevo dataset
-        except (FileNotFoundError, pd.errors.EmptyDataError):
-            dataset = pd.DataFrame()
-        # para cada csv que encuentra de ejecuciones pasadas lo concatena al archivo dataset
-        for result in glob.glob(os.path.join(self.data_path, '../*/*.csv')):
-            data = pd.read_csv(result, sep=";", encoding="utf-8")
-            dataset = pd.concat([dataset, data])
-        # eliminamos duplicados
-        dataset.drop_duplicates(inplace=True)
-        dataset.to_csv(os.path.join(self.data_path, '..', 'dataset.csv'), sep=";", encoding="utf-8", index=False)
-
     def start_scraping(self, reload: bool = False):
         """
         Funciona principal que realiza el proceso de scraping. En funcion del parámetro reload
