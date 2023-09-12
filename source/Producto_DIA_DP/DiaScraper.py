@@ -168,7 +168,7 @@ class DiaScraper:
 
             # Cada 100 elementos o cuando ya no queden elementos por tratar:
             # insertamos los elementos tratados y purgamos la tabla de staging
-            if number_products_scan == elementos_tratados or elementos_tratados % 100 == 0:
+            if number_products_scan == elementos_tratados or elementos_tratados % 500 == 0:
 
                 pdf = Producto.list_to_spark_df(lista_productos, self.sparkDB.spark)
 
@@ -182,5 +182,4 @@ class DiaScraper:
 
                 logging.warning(f">>>>> Borrando productos con indice menor que  {stg_producto['index']} .")
 
-        self.__save_results()
         return

@@ -60,7 +60,7 @@ class Producto:
     @staticmethod
     def list_to_spark_df(producto_list: list, spark: pyspark.sql.SparkSession) -> pyspark.sql.DataFrame:
 
-        lista_dict = [producto.to_tuple for producto in producto_list ]
+        lista_dict = [producto.to_tuple() for producto in producto_list]
 
         df = spark.createDataFrame(data=lista_dict, schema=Producto.producto_dim_schema)
 
