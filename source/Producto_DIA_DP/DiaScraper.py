@@ -1,12 +1,7 @@
 from itertools import product
 
 import utils
-import hashlib
-import glob
-import shutil
 import sys
-import pandas as pd
-import json
 from Producto import Producto
 import re as re
 import SparkDBUtils
