@@ -1,10 +1,7 @@
+from itertools import product
+
 import utils
-import hashlib
-import glob
-import shutil
 import sys
-import pandas as pd
-import json
 from Producto import Producto
 import re as re
 import SparkDBUtils
@@ -75,52 +72,6 @@ class DiaScraper:
 
         self.sparkDB.write_table(df, "producto_dia.staging_product", "overwrite", None)
 
-    def __save_record(self, record: Producto, filename: str):
-        """
-        saves scrapped information in temp folder.
-        """
-        with open(os.path.join(self.data_path, 'tmp', hashlib.md5(filename.encode()).hexdigest() + '.json'), 'w+',
-                  encoding='utf-8') as f:
-            json.dump(record.to_dict(), f, ensure_ascii=False)
-
-    def __save_results(self):
-        """
-        aggregates temp information in a single csv from the execution
-        """
-        json_output = {"data": []}
-        logging.info("Crawling finished. Processing tmp data.")
-        # para cada archivo que encontramos en la carpeta tmp lo guardamos en memoria.
-        for file in glob.glob(os.path.join(self.data_path, 'tmp', '*.json')):
-            with open(file, 'r+', encoding='utf-8') as f:
-                record = json.loads(f.read())
-                json_output["data"].append(record)
-
-        # guardamos la lista total en csv.
-        pd.DataFrame(json_output["data"]) \
-            .to_csv(os.path.join(self.data_path,
-                                 datetime.datetime.strftime(self.execution_datetime,
-                                                            '%Y%m%d_%H%M') + '_dia.csv'),
-                    sep=";", encoding="utf-8", index=False)
-        # eliminamos el directorio tmp
-        shutil.rmtree(os.path.join(self.data_path, 'tmp'))
-
-    def generate_dataset(self):
-        """
-        Appends or generates the dataset.csv file with the newly scrapped information.
-        """
-        try:
-            dataset = pd.read_csv(os.path.join(self.data_path, '..', 'dataset.csv'), sep=";", encoding="utf-8")
-        # si no existe o no contiene datos, generamos un nuevo dataset
-        except (FileNotFoundError, pd.errors.EmptyDataError):
-            dataset = pd.DataFrame()
-        # para cada csv que encuentra de ejecuciones pasadas lo concatena al archivo dataset
-        for result in glob.glob(os.path.join(self.data_path, '../*/*.csv')):
-            data = pd.read_csv(result, sep=";", encoding="utf-8")
-            dataset = pd.concat([dataset, data])
-        # eliminamos duplicados
-        dataset.drop_duplicates(inplace=True)
-        dataset.to_csv(os.path.join(self.data_path, '..', 'dataset.csv'), sep=";", encoding="utf-8", index=False)
-
     def start_scraping(self, reload: bool = False):
         """
         Funciona principal que realiza el proceso de scraping. En funcion del parámetro reload
@@ -138,38 +89,46 @@ class DiaScraper:
         df_staging_product = self.sparkDB.spark\
             .table("producto_dia.staging_product")\
             .orderBy("index")\
-            .pandas_api()
+            .toPandas()
 
         number_products_scan = len(df_staging_product)
         elementos_tratados = 0
+        lista_productos = []
 
         # Recorro todos los productos de la tabla de staging
-        for i, producto in df_staging_product.iterrows():
-
-            product_number = producto['id_producto']
-            product_url = producto['url_product']
-            index = producto["index"]
+        for i, stg_producto in df_staging_product.iterrows():
 
             logging.info(f"Number of products left: {number_products_scan - elementos_tratados}")
 
-            logging.info(f"Crawling {product_url}")
-            record = utils.get_info_from_url(product_url)
-            logging.info(f"Scanned: product_id: {product_number}")
-            try:
-                # TODO: Este metodo debe escribir en la tabla final
-                self.__save_record(record, record.product)
+            logging.info(f" Scraping: product_id: {stg_producto['id_producto']} : {stg_producto['url_product']}")
 
-            except AttributeError:
-                logging.warning(f"{product_url} failed. No information retrieved.")
+            try:
+                producto = utils.get_info_from_url(stg_producto['url_product'])
+
+                producto.ts_load = datetime.datetime.now()
+
+                lista_productos.append(producto)
+
+            except Exception as e:
+                logging.warning(f"!!!Failed. Exception: {e}")
 
             # Actualización de punteros
             elementos_tratados += 1
 
-            # Cada 100 elementos, purgamos la tabla de staging o cuando ya no queden elementos por tratar
-            if number_products_scan == elementos_tratados or elementos_tratados % 100 == 0:
-                dt = delta.DeltaTable.forName(self.sparkDB.spark, "producto_dia.staging_product")
-                dt.delete(F.col("index") <= index)
-                logging.warning(f"Borrando productos con indice menor que  {index} .")
+            # Cada 100 elementos o cuando ya no queden elementos por tratar:
+            # insertamos los elementos tratados y purgamos la tabla de staging
+            if number_products_scan == elementos_tratados or elementos_tratados % 500 == 0:
 
-        self.__save_results()
+                pdf = Producto.list_to_spark_df(lista_productos, self.sparkDB.spark)
+
+                self.sparkDB.write_table(pdf, "producto_dia.producto_dim", "append")
+
+                lista_productos = []
+
+                dt = delta.DeltaTable.forName(self.sparkDB.spark, "producto_dia.staging_product")
+
+                dt.delete(F.col("index") <= stg_producto['index'])
+
+                logging.warning(f">>>>> Borrando productos con indice menor que  {stg_producto['index']} .")
+
         return

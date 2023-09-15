@@ -5,8 +5,10 @@ import datetime as dt
 
 def create_db(spark):
 
+    spark.sql("CREATE SCHEMA IF NOT EXISTS analisis_precios")
+
     sequences_cfg = """
-            CREATE OR REPLACE TABLE sequences_cfg
+            CREATE OR REPLACE TABLE analisis_precios.sequences_cfg
             (
                 table_name STRING,
                 id BIGINT,
@@ -17,7 +19,7 @@ def create_db(spark):
     spark.sql(sequences_cfg)
 
     date_dim = """
-        CREATE OR REPLACE TABLE date_dim
+        CREATE OR REPLACE TABLE analisis_precios.date_dim
         (
             id_date int,
             date date,
@@ -29,13 +31,13 @@ def create_db(spark):
     spark.sql(date_dim)
 
     conf = f"""
-        INSERT INTO sequences_cfg VALUES('date_dim',0,'{dt.datetime.now()}')
+        INSERT INTO analisis_precios.sequences_cfg VALUES('analisis_precios.date_dim',0,'{dt.datetime.now()}')
     """
 
     spark.sql(conf)
 
     product_dim = """
-            CREATE OR REPLACE TABLE producto_dim
+            CREATE OR REPLACE TABLE analisis_precios.producto_dim
             (
                 id_producto int,
                 product string,
@@ -52,13 +54,13 @@ def create_db(spark):
     spark.sql(product_dim)
 
     conf = f"""
-            INSERT INTO sequences_cfg VALUES('producto_dim',0,'{dt.datetime.now()}')
+            INSERT INTO analisis_precios.sequences_cfg VALUES('analisis_precios.producto_dim',0,'{dt.datetime.now()}')
         """
 
     spark.sql(conf)
 
     producto_dia_fact = """
-                CREATE OR REPLACE TABLE producto_dia_fact
+                CREATE OR REPLACE TABLE analisis_precios.producto_dia_fact
                 (
                     id_producto int,
                     id_date int,
@@ -74,7 +76,7 @@ def create_db(spark):
     spark.sql(producto_dia_fact)
 
     precio_dia_agg_norm_fact = """
-                    CREATE OR REPLACE TABLE precio_dia_agg_norm_fact
+                    CREATE OR REPLACE TABLE analisis_precios.precio_dia_agg_norm_fact
                     (
                         id_date int,
                         sum_price double,
