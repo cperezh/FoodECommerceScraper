@@ -50,6 +50,7 @@ def get_info_from_url(url: str) -> Producto:
     """
     param url: url address to scrap
     return: dic with scrapped information.
+    raise ProductoIncorrectoException: when coudn't fetch any product information
     """
 
     page = get_html_page(url)
@@ -68,6 +69,7 @@ def get_info_from_url(url: str) -> Producto:
     if any([producto.price is None, producto.product is None, producto.brand is None,
             producto.unit_price is None, producto.units is None]):
         logging.warning(f"{url} failed. Missing information.")
+        raise ProductoIncorrectoException(f"Producto_id: {producto.product_id}")
 
     return producto
 
@@ -174,3 +176,6 @@ def __print_page(page: BeautifulSoup, ruta: str):
     with open(ruta, "w", encoding="utf-8") as f:
         f.write(page.prettify())
 
+
+class ProductoIncorrectoException(Exception):
+    ...
