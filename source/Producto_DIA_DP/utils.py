@@ -164,7 +164,8 @@ def __process_brand(text: str) -> str:
 
 def process_name(text: str) -> str:
     text = __preprocess_str(text)
-    match = re.findall('[A-Z][a-z áéíóú]+', text)
+    # match = re.findall('[A-Z][a-z áéíóú]+', text)
+    match = re.findall('.*', text)
 
     return match[0]
 
