@@ -9,3 +9,4 @@ pyarrow==10.0.1
 jupyterlab==3.5.2
 delta-spark==2.2.0
 plotly==5.13.1
+scipy==1.6.2
