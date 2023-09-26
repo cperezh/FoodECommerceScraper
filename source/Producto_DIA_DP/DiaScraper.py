@@ -1,5 +1,3 @@
-from itertools import product
-
 import utils
 import sys
 from Producto import Producto
@@ -11,7 +9,8 @@ import datetime
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType
 import delta
 import pyspark.sql.functions as F
-
+from utils import ProductoIncorrectoException
+from requests.exceptions import ConnectionError
 
 class DiaScraper:
     """
@@ -109,8 +108,12 @@ class DiaScraper:
 
                 lista_productos.append(producto)
 
-            except Exception as e:
+            except ProductoIncorrectoException as e:
                 logging.warning(f"!!!Failed. Exception: {e}")
+
+            except ConnectionError as e:
+                logging.warning(f"!!!ConnectionError. Exception: {e}")
+                break
 
             # Actualización de punteros
             elementos_tratados += 1
@@ -132,3 +135,20 @@ class DiaScraper:
                 logging.warning(f">>>>> Borrando productos con indice menor que  {stg_producto['index']} .")
 
         return
+
+    def insertar_url_pruebas(self):
+
+        producto = [(258603, "https://www.dia.es/agua-refrescos-y-zumos/cola/p/258603",0)]
+
+        df = self.sparkDB.spark.createDataFrame(producto, schema=DiaScraper.staging_product_schema)
+
+        self.sparkDB.write_table(df, "producto_dia.staging_product", mode="overwrite")
+
+
+if __name__ == "__main__":
+    diaScraper = DiaScraper()
+
+    diaScraper.insertar_url_pruebas()
+
+
+
